@@ -1,0 +1,1681 @@
+<!doctype html>
+<!--
+  Cisco Cheat Sheet : site statique en un seul fichier (HTML + CSS + JavaScript).
+  Aucune dépendance, sauf les polices Google Fonts (le site fonctionne aussi sans).
+
+  Structure du fichier :
+    1. <style>  : thème, mise en page, cartes, blocs de code, mode entraînement
+    2. <body>   : barre latérale, recherche, zone de contenu (#out)
+    3. <script> : données (D), affichage, recherche, favoris, entraînement
+-->
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Cisco Cheat Sheet</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ===== Thème : couleurs (--bg fond, --pn cartes, --tx texte, --ac accent, --cb code) et polices ===== */
+      :root {
+        box-sizing: border-box;
+        --bg: #edf1f6;
+        --pn: #fff;
+        --tx: #0d1f33;
+        --mu: #5b6b80;
+        --bd: #d6dee9;
+        --ac: #0a7fd1;
+        --pu: #6d3fe0;
+        --side: #0a2540;
+        --sx: #b4c6dc;
+        --cb: #081423;
+        --cx: #d7e4f5;
+        --k: #5ad1ff;
+        --n: #ffc86b;
+        --v: #ff8aa5;
+        --cm: #6a819c;
+        --g: #35d07f;
+        --a: #ffb020;
+        --r: #ff5d6c;
+        --b: #3aa0ff;
+        --f1: "Bricolage Grotesque", system-ui, -apple-system, Segoe UI, sans-serif;
+        --f2: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+      }
+      /* Thème sombre : automatique selon le système, ou forcé avec data-theme (bouton Thème) */
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+          --bg: #07101c;
+          --pn: #0e1b2d;
+          --tx: #e6eef9;
+          --mu: #8a9bb2;
+          --bd: #1b2b42;
+          --ac: #4aa8ff;
+          --pu: #a58bff;
+          --side: #050c16;
+          --cb: #050b14;
+        }
+      }
+      :root[data-theme="dark"] {
+        --bg: #07101c;
+        --pn: #0e1b2d;
+        --tx: #e6eef9;
+        --mu: #8a9bb2;
+        --bd: #1b2b42;
+        --ac: #4aa8ff;
+        --pu: #a58bff;
+        --side: #050c16;
+        --cb: #050b14;
+      }
+      html {
+        scroll-padding-top: 90px;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--tx);
+        font: 15px/1.55 var(--f1);
+      }
+      button {
+        font: inherit;
+        cursor: pointer;
+        color: inherit;
+        background: none;
+        border: 0;
+      }
+      button:focus-visible,
+      #q:focus-visible {
+        outline: 2px solid var(--ac);
+        outline-offset: 2px;
+      }
+      /* ===== Mise en page : barre latérale + contenu ===== */
+      .app {
+        display: flex;
+        min-height: 100%;
+      }
+      /* Barre latérale */
+      aside {
+        width: 232px;
+        flex: none;
+        background: var(--side);
+        color: var(--sx);
+        padding: calc(22px + env(safe-area-inset-top, 0px)) 14px
+          calc(18px + env(safe-area-inset-bottom, 0px));
+        position: sticky;
+        top: 0;
+        align-self: flex-start;
+        max-height: 100vh;
+        overflow: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 22px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        color: #fff;
+        font: 800 20px/1.05 var(--f1);
+        letter-spacing: -0.02em;
+        padding: 0 6px;
+      }
+      .brand small {
+        display: block;
+        font: 500 13px var(--f1);
+        color: var(--sx);
+        letter-spacing: 0;
+        margin-top: 3px;
+      }
+      nav {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+      nav button {
+        text-align: left;
+        padding: 9px 12px;
+        border-radius: 9px;
+        color: var(--sx);
+        font-weight: 500;
+      }
+      nav button:hover {
+        background: #ffffff0f;
+        color: #fff;
+      }
+      nav button.on {
+        background: #ffffff17;
+        color: #fff;
+        box-shadow: inset 3px 0 0 #049fd9;
+      }
+      #th {
+        margin-top: auto;
+        text-align: left;
+        padding: 9px 12px;
+        border-radius: 9px;
+        border: 1px solid #ffffff1f;
+        color: var(--sx);
+      }
+      #th:hover {
+        color: #fff;
+        border-color: #ffffff40;
+      }
+      main {
+        flex: 1;
+        min-width: 0;
+        padding: 0 clamp(14px, 3vw, 36px) 70px;
+      }
+      /* Zone de recherche (reste visible en haut) */
+      .hero {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        padding: calc(18px + env(safe-area-inset-top, 0px)) 0 14px;
+        background: linear-gradient(var(--bg) 82%, transparent);
+      }
+      .prompt {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background: var(--cb);
+        border-radius: 16px;
+        padding: 0 20px;
+        box-shadow:
+          0 0 0 1px #ffffff1a,
+          0 14px 34px -16px #0a254099;
+      }
+      .prompt:focus-within {
+        box-shadow:
+          0 0 0 2px var(--ac),
+          0 14px 34px -16px #0a2540cc;
+      }
+      .prompt b {
+        font: 600 18px var(--f2);
+        color: var(--g);
+      }
+      #q {
+        flex: 1;
+        min-width: 0;
+        border: 0;
+        background: none;
+        color: #eaf3ff;
+        font: 500 18px var(--f2);
+        padding: 17px 0;
+        caret-color: var(--g);
+        outline: 0;
+      }
+      #q::placeholder {
+        color: #5f7794;
+      }
+      .bar {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
+        margin-top: 12px;
+        color: var(--mu);
+        font-size: 13px;
+      }
+      .bar:empty {
+        display: none;
+      }
+      #flt button {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 5px 12px;
+        border-radius: 99px;
+        border: 1px solid var(--bd);
+        background: var(--pn);
+        color: var(--tx);
+        font-weight: 500;
+      }
+      #flt button::before {
+        content: "";
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--led);
+        box-shadow: 0 0 6px var(--led);
+      }
+      #flt button.on {
+        background: var(--tx);
+        color: var(--bg);
+        border-color: var(--tx);
+      }
+      #flt [data-t="C"] {
+        --led: var(--g);
+      }
+      #flt [data-t="S"] {
+        --led: var(--b);
+      }
+      #flt [data-t="T"] {
+        --led: var(--a);
+      }
+      #flt [data-t="D"] {
+        --led: var(--r);
+      }
+      .rec button {
+        font: 12px var(--f2);
+        padding: 2px 10px;
+        border-radius: 99px;
+        border: 1px dashed var(--bd);
+        color: var(--mu);
+      }
+      .rec button:hover {
+        color: var(--ac);
+        border-color: var(--ac);
+      }
+      /* Cartes des protocoles (colonnes automatiques) */
+      .grid {
+        columns: 420px 3;
+        column-gap: 18px;
+      }
+      .card {
+        break-inside: avoid;
+        margin-bottom: 18px;
+        background: var(--pn);
+        border: 1px solid var(--bd);
+        border-radius: 18px;
+        padding: 20px 18px 16px;
+        min-width: 0;
+      }
+      .card h2 {
+        margin: 0;
+        font: 700 24px/1.15 var(--f1);
+        letter-spacing: -0.02em;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .tag {
+        font: 600 11px var(--f1);
+        border-radius: 99px;
+        padding: 2px 9px;
+        background: var(--bg);
+        color: var(--mu);
+      }
+      .tag.CCNA {
+        background: #0a7fd120;
+        color: var(--ac);
+      }
+      .tag.ENCOR {
+        background: #8b5cf624;
+        color: var(--pu);
+      }
+      .card p {
+        margin: 6px 0 12px;
+        color: var(--mu);
+        font-size: 14px;
+        max-width: 62ch;
+      }
+      /* Blocs de commandes : voyant coloré = type de bloc */
+      .blk {
+        background: var(--cb);
+        border-radius: 11px;
+        margin-top: 10px;
+        overflow: hidden;
+        border: 1px solid #ffffff12;
+      }
+      .bh {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 6px 8px 6px 13px;
+        background: #ffffff09;
+        border-bottom: 1px solid #ffffff10;
+        color: #9fb3cc;
+        font: 600 12px var(--f1);
+        letter-spacing: 0.03em;
+      }
+      .bh::before {
+        content: "";
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--led, var(--b));
+        box-shadow: 0 0 8px var(--led, var(--b));
+      }
+      .bh span {
+        color: #fff;
+      }
+      .bh em {
+        margin-right: auto;
+        font: 400 12px var(--f2);
+        color: #667f9d;
+        font-style: normal;
+        letter-spacing: 0;
+      }
+      .bh span:nth-last-child(2) {
+        margin-right: auto;
+      }
+      .bh.C {
+        --led: var(--g);
+      }
+      .bh.S {
+        --led: var(--b);
+      }
+      .bh.T {
+        --led: var(--a);
+      }
+      .bh.D {
+        --led: var(--r);
+      }
+      .bh button {
+        font: 600 12px var(--f1);
+        padding: 3px 11px;
+        border-radius: 7px;
+        background: #ffffff14;
+        color: #fff;
+      }
+      .bh button:hover {
+        background: #049fd9;
+      }
+      /* Lignes de commandes et coloration */
+      pre {
+        margin: 0;
+        padding: 8px 0;
+        overflow-x: auto;
+        font: 13px/1.65 var(--f2);
+        color: var(--cx);
+      }
+      .l {
+        display: flex;
+        align-items: center;
+        padding: 0 12px;
+        white-space: pre;
+      }
+      .l:hover {
+        background: #ffffff0c;
+      }
+      .l span.t {
+        flex: 1;
+        min-width: 0;
+      }
+      .st {
+        opacity: 0.2;
+        color: var(--n);
+        padding: 0 4px 0 12px;
+        font-size: 15px;
+      }
+      .l:hover .st,
+      .st.f {
+        opacity: 1;
+      }
+      /* Couleurs de la coloration : .k commande, .nm nombres, .vr variables, .cm commentaires */
+      .k {
+        color: var(--k);
+        font-weight: 600;
+      }
+      .nm {
+        color: var(--n);
+      }
+      .vr {
+        color: var(--v);
+        font-weight: 600;
+      }
+      .cm {
+        color: var(--cm);
+        font-style: italic;
+        display: block;
+        white-space: pre-wrap;
+      }
+      .empty {
+        color: var(--mu);
+        padding: 60px 20px;
+        text-align: center;
+        font-size: 16px;
+      }
+      /* Mobile : le menu passe en bandeau horizontal */
+      @media (max-width: 820px) {
+        .app {
+          flex-direction: column;
+        }
+        aside {
+          width: auto;
+          position: static;
+          max-height: none;
+          flex-direction: row;
+          align-items: center;
+          gap: 10px;
+          padding: calc(12px + env(safe-area-inset-top, 0px)) 14px 10px;
+          overflow-x: auto;
+        }
+        .brand small,
+        .brand div {
+          display: none;
+        }
+        nav {
+          flex-direction: row;
+        }
+        nav button {
+          white-space: nowrap;
+        }
+        #th {
+          margin: 0 0 0 auto;
+          white-space: nowrap;
+        }
+        .grid {
+          columns: 1;
+        }
+      }
+      /* ===== Mode entraînement ===== */
+      #flt [data-d="easy"] {
+        --led: var(--g);
+      }
+      #flt [data-d="mid"] {
+        --led: var(--a);
+      }
+      #flt [data-d="hard"] {
+        --led: var(--r);
+      }
+      .tcard {
+        max-width: 860px;
+        margin-inline: auto;
+      }
+      .tr input {
+        flex: 1;
+        min-width: 0;
+        background: #ffffff0d;
+        border: 0;
+        border-bottom: 1px solid #ffffff30;
+        color: #eaf3ff;
+        font: 13px/1.65 var(--f2);
+        padding: 0 8px;
+        margin: 2px 0;
+        border-radius: 4px;
+        outline: 0;
+      }
+      .tr input:focus {
+        background: #ffffff18;
+        border-color: var(--ac);
+      }
+      .tr input.ok {
+        border-color: var(--g);
+        color: #aef0cb;
+      }
+      .tr input.ko {
+        border-color: var(--r);
+        color: #ffb3bb;
+      }
+      .tr input.sol {
+        color: var(--n);
+      }
+      .mk {
+        width: 22px;
+        text-align: center;
+        font-weight: 700;
+      }
+      .tr:has(.ok) .mk {
+        color: var(--g);
+      }
+      .tr:has(.ko) .mk {
+        color: var(--r);
+      }
+      .ind {
+        white-space: pre;
+      }
+      .acts {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 14px;
+      }
+      .acts button {
+        padding: 8px 16px;
+        border-radius: 10px;
+        border: 1px solid var(--bd);
+        font-weight: 600;
+      }
+      .acts button:hover {
+        border-color: var(--ac);
+        color: var(--ac);
+      }
+      .acts .pri {
+        background: var(--ac);
+        border-color: var(--ac);
+        color: #fff;
+      }
+      .acts .pri:hover {
+        color: #fff;
+        filter: brightness(1.1);
+      }
+      .fb {
+        margin-top: 10px;
+        min-height: 1.4em;
+        color: var(--mu);
+        font-size: 14px;
+      }
+      .bh b.sc {
+        font: 600 12px var(--f2);
+        color: var(--n);
+        background: #ffb02022;
+        padding: 2px 10px;
+        border-radius: 99px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <aside>
+        <div class="brand">
+          <svg width="30" height="26" viewBox="0 0 30 26" aria-hidden="true">
+            <g fill="#049fd9">
+              <rect x="0" y="16" width="5" height="10" rx="2.5" />
+              <rect x="8" y="10" width="5" height="16" rx="2.5" />
+              <rect x="16" y="5" width="5" height="21" rx="2.5" />
+              <rect x="24" y="0" width="5" height="26" rx="2.5" />
+            </g>
+          </svg>
+          <div>Cisco<br />Cheat Sheet<small>Commandes IOS</small></div>
+        </div>
+        <nav id="nav"></nav>
+        <button id="th" title="Basculer thème clair / sombre">◐ Thème</button>
+      </aside>
+      <main>
+        <div class="hero">
+          <label class="prompt"
+            ><b>Switch#</b
+            ><input
+              id="q"
+              type="search"
+              placeholder="ospf neighbor, trunk, etherchannel…"
+              autocomplete="off"
+              aria-label="Rechercher une commande"
+          /></label>
+          <div class="bar" id="flt"></div>
+          <div class="bar rec" id="rec"></div>
+        </div>
+        <div id="out"></div>
+      </main>
+    </div>
+    <script>
+      /*
+       * DONNÉES : une entrée par technologie. Pour en ajouter une, copie un bloc.
+       *   name, description : texte affiché sur la fiche
+       *   level    : "CCNA" ou "ENCOR" (onglets CCNA / CCNP ENCOR)
+       *   category : "" ou "sec" (Security) ou "svc" (Services)
+       *   prompt   : équipement affiché dans le prompt : "R1" (routeur) ou "SW1" (switch)
+       *   config, show, troubleshoot, debug : une commande par ligne.
+       *   Les <VARIABLES> en majuscules sont surlignées et acceptent n'importe quelle valeur à l'entraînement.
+       */
+      const D = [
+        {
+          name: "Basic IOS",
+          level: "CCNA",
+          category: "",
+          prompt: "R1",
+          description:
+            "La configuration de base à faire sur tout équipement neuf : lui donner un nom, protéger l'accès au mode privilégié, rendre la console plus confortable et surtout sauvegarder. La configuration en cours (running-config) est en mémoire vive : sans sauvegarde dans la startup-config, tout est perdu au redémarrage.",
+          config: `! Nom de l'équipement (il apparaît dans le prompt)
+hostname <HOSTNAME>
+! Évite que IOS prenne une faute de frappe pour un nom DNS et attende de le résoudre
+no ip domain-lookup
+! Mot de passe du mode privilégié, stocké sous forme de hash
+enable secret <PASSWORD>
+! Chiffre (faiblement) les mots de passe restés en clair dans la configuration
+service password-encryption
+! Message affiché avant la connexion
+banner motd #<MESSAGE>#
+! Console : les logs n'interrompent plus la saisie et la session ne se ferme plus toute seule
+line console 0
+ logging synchronous
+ exec-timeout 0 0
+! Sauvegarde la configuration courante dans la NVRAM
+copy running-config startup-config`,
+          show: `show running-config
+show startup-config
+show version
+show clock
+show history`,
+          troubleshoot: `show logging
+show running-config | section <KEYWORD>`,
+          debug: `terminal monitor
+undebug all`,
+        },
+        {
+          name: "Interfaces",
+          level: "CCNA",
+          category: "",
+          prompt: "R1",
+          description:
+            "Les interfaces sont les ports de l'équipement. Il faut les configurer (adresse IP, description, vitesse) puis les activer : sur un routeur, une interface est éteinte (shutdown) par défaut. Vérifier leur état est le premier réflexe de tout dépannage.",
+          config: `! Entre dans la configuration du port
+interface GigabitEthernet0/1
+ ! Texte libre pour documenter à quoi sert le port
+ description <TEXT>
+ ! Adresse IP et masque de l'interface
+ ip address <IP_ADDRESS> <SUBNET_MASK>
+ ! Vitesse et duplex négociés automatiquement avec l'équipement en face
+ speed auto
+ duplex auto
+ ! Active l'interface
+ no shutdown`,
+          show: `show ip interface brief
+show interfaces
+show interfaces status
+show interfaces description`,
+          troubleshoot: `show interfaces <INTERFACE>
+show interfaces counters errors
+show controllers <INTERFACE>`,
+          debug: ``,
+        },
+        {
+          name: "VLAN",
+          level: "CCNA",
+          category: "",
+          prompt: "SW1",
+          description:
+            "Un VLAN découpe un switch en plusieurs réseaux de niveau 2 isolés, même s'ils partagent le même matériel. Il sert à séparer les services (comptabilité, invités, serveurs), à réduire les domaines de broadcast et à améliorer la sécurité. Chaque VLAN utilise en général son propre sous-réseau IP.",
+          config: `! Crée le VLAN et lui donne un nom
+vlan <VLAN_ID>
+ name <VLAN_NAME>
+! Sélectionne le port à affecter au VLAN
+interface <INTERFACE>
+ ! Port d'accès : il appartient à un seul VLAN (PC, imprimante...)
+ switchport mode access
+ ! VLAN auquel le port est affecté
+ switchport access vlan <VLAN_ID>`,
+          show: `show vlan brief
+show interfaces switchport
+show mac address-table`,
+          troubleshoot: `show vlan brief
+show interfaces switchport
+show mac address-table vlan <VLAN_ID>`,
+          debug: ``,
+        },
+        {
+          name: "Trunk / 802.1Q",
+          level: "CCNA",
+          category: "",
+          prompt: "SW1",
+          description:
+            "Un trunk transporte plusieurs VLAN sur un seul lien, entre deux switchs ou entre un switch et un routeur. Le standard 802.1Q ajoute à chaque trame une étiquette (tag) contenant son numéro de VLAN, ce qui évite d'utiliser un câble par VLAN.",
+          config: `! Port qui relie deux switchs (ou un switch et un routeur)
+interface <INTERFACE>
+ ! Encapsulation 802.1Q (les switchs récents ne la proposent plus : la ligne est alors refusée)
+ switchport trunk encapsulation dot1q
+ ! Force le port en trunk
+ switchport mode trunk
+ ! Limite les VLAN autorisés sur la liaison
+ switchport trunk allowed vlan <VLAN_LIST>
+ ! VLAN natif : trames non étiquetées, à garder identique aux deux extrémités
+ switchport trunk native vlan <VLAN_ID>`,
+          show: `show interfaces trunk
+show interfaces <INTERFACE> switchport`,
+          troubleshoot: `show interfaces trunk
+show interfaces switchport
+show spanning-tree vlan <VLAN_ID>`,
+          debug: `debug dtp packets`,
+        },
+        {
+          name: "Inter-VLAN Routing",
+          level: "CCNA",
+          category: "",
+          prompt: "R1/SW1",
+          description:
+            "Les VLAN étant isolés, il faut un équipement de niveau 3 pour les faire communiquer. Le router-on-a-stick utilise un seul lien trunk vers un routeur ; un switch L3 route lui-même grâce à des interfaces virtuelles (SVI), plus rapidement. Dans les deux cas, l'adresse IP configurée sert de passerelle aux machines du VLAN.",
+          config: `! ----- Méthode 1 : router-on-a-stick (sur le routeur) -----
+! Sous-interface dédiée à un VLAN, sur le lien trunk vers le switch
+interface GigabitEthernet0/0.<VLAN_ID>
+ ! Étiquette 802.1Q des trames de ce VLAN
+ encapsulation dot1Q <VLAN_ID>
+ ! Passerelle par défaut des machines de ce VLAN
+ ip address <IP_ADDRESS> <SUBNET_MASK>
+! ----- Méthode 2 : switch L3 avec SVI (sur le switch) -----
+! Active le routage IP sur le switch
+ip routing
+! SVI : interface virtuelle du VLAN, qui sert de passerelle
+interface vlan <VLAN_ID>
+ ip address <IP_ADDRESS> <SUBNET_MASK>
+ no shutdown`,
+          show: `show ip interface brief
+show ip route
+show interfaces trunk`,
+          troubleshoot: `show vlan brief
+show ip route connected`,
+          debug: ``,
+        },
+        {
+          name: "STP / RSTP",
+          level: "CCNA",
+          category: "",
+          prompt: "SW1",
+          description:
+            "Le Spanning Tree évite les boucles de niveau 2 quand des switchs sont reliés par plusieurs chemins : une boucle provoque des tempêtes de broadcast qui paralysent le réseau. Il élit un switch racine, bloque les liens redondants et les réactive en cas de panne. RSTP fait la même chose avec une convergence beaucoup plus rapide.",
+          config: `! Mode Rapid PVST+ : convergence en quelques secondes au lieu de 30 à 50 s
+spanning-tree mode rapid-pvst
+! Ce switch devient la racine (root bridge) du VLAN : sa priorité est abaissée automatiquement
+spanning-tree vlan <VLAN_ID> root primary
+! Ou priorité fixée à la main (multiple de 4096) : la plus basse est élue racine
+spanning-tree vlan <VLAN_ID> priority 4096
+! Port relié à un poste final
+interface <INTERFACE>
+ ! Passe directement en forwarding, sans attendre
+ spanning-tree portfast
+ ! Coupe le port si un switch y est branché (réception d'un BPDU) : protège contre les boucles
+ spanning-tree bpduguard enable`,
+          show: `show spanning-tree
+show spanning-tree summary
+show spanning-tree vlan <VLAN_ID>
+show spanning-tree interface <INTERFACE> detail`,
+          troubleshoot: `show spanning-tree blockedports
+show spanning-tree inconsistentports`,
+          debug: `debug spanning-tree events
+undebug all`,
+        },
+        {
+          name: "EtherChannel / LACP",
+          level: "CCNA",
+          category: "",
+          prompt: "SW1",
+          description:
+            "L'EtherChannel regroupe plusieurs liens physiques en un seul lien logique : plus de bande passante et de la redondance. STP le voit comme un seul lien, donc aucun port n'est bloqué. LACP (802.3ad) négocie le groupe avec l'autre équipement ; les paramètres des ports doivent être identiques des deux côtés.",
+          config: `! Sélectionne tous les ports physiques à regrouper
+interface range <INTERFACE_RANGE>
+ ! Les place dans le groupe ; active = ce switch propose LACP à l'autre extrémité
+ channel-group <ID> mode active
+! Interface logique créée automatiquement : les réglages (trunk, VLAN...) se font ici
+interface port-channel <ID>
+ switchport mode trunk`,
+          show: `show etherchannel summary
+show interfaces port-channel <ID>
+show etherchannel port-channel`,
+          troubleshoot: `show etherchannel summary
+show lacp neighbor
+show running-config interface <INTERFACE>`,
+          debug: `debug lacp packet
+debug etherchannel`,
+        },
+        {
+          name: "DHCP",
+          level: "CCNA",
+          category: "svc",
+          prompt: "R1",
+          description:
+            "Le DHCP distribue automatiquement aux machines leur adresse IP, leur masque, leur passerelle et leur DNS, au lieu de les saisir à la main. Un routeur peut faire office de serveur. Si le serveur est sur un autre réseau, un relais transmet les requêtes des clients, car les broadcasts ne traversent pas les routeurs.",
+          config: `! Adresses à ne jamais distribuer (passerelle, serveurs, imprimantes...)
+ip dhcp excluded-address <START_IP> <END_IP>
+! Crée la plage d'adresses à distribuer
+ip dhcp pool <POOL_NAME>
+ ! Réseau concerné
+ network <NETWORK> <SUBNET_MASK>
+ ! Passerelle par défaut donnée aux clients
+ default-router <GATEWAY_IP>
+ ! Serveur DNS donné aux clients
+ dns-server <DNS_IP>
+! Relais DHCP : sur l'interface côté clients, quand le serveur est sur un autre réseau
+interface <INTERFACE>
+ ip helper-address <DHCP_SERVER_IP>`,
+          show: `show ip dhcp binding
+show ip dhcp pool
+show ip dhcp conflict`,
+          troubleshoot: `show ip dhcp conflict
+show ip dhcp server statistics
+show ip interface <INTERFACE>`,
+          debug: `debug ip dhcp server events
+debug ip dhcp server packet`,
+        },
+        {
+          name: "NAT / PAT",
+          level: "CCNA",
+          category: "svc",
+          prompt: "R1",
+          description:
+            "Le NAT remplace les adresses IP privées, non routables sur Internet, par une adresse publique. Avec le PAT (overload), tout un réseau partage une seule IP publique et les connexions sont distinguées par leur numéro de port. C'est ce qui permet à un réseau local d'accéder à Internet.",
+          config: `! Interface côté réseau interne (LAN)
+interface <INSIDE_INTERFACE>
+ ip nat inside
+! Interface côté Internet
+interface <OUTSIDE_INTERFACE>
+ ip nat outside
+! ACL qui désigne les adresses privées à traduire
+access-list 1 permit <NETWORK> <WILDCARD>
+! Traduit ces adresses vers l'IP de l'interface externe ; overload = PAT (partage via les ports)
+ip nat inside source list 1 interface <OUTSIDE_INTERFACE> overload`,
+          show: `show ip nat translations
+show ip nat statistics`,
+          troubleshoot: `show ip nat statistics
+show access-lists
+show ip route`,
+          debug: `debug ip nat
+undebug all`,
+        },
+        {
+          name: "ACL",
+          level: "CCNA",
+          category: "sec",
+          prompt: "R1",
+          description:
+            "Une ACL est une liste de règles permit / deny qui filtre le trafic selon les adresses, les protocoles et les ports. Les règles sont lues de haut en bas et la première qui correspond s'applique ; un deny implicite termine toujours la liste. On place une ACL étendue au plus près de la source du trafic.",
+          config: `! ACL étendue nommée : filtre selon source, destination, protocole et port
+ip access-list extended <ACL_NAME>
+ ! Autorise le SSH (TCP 22) depuis le réseau source
+ permit tcp <SOURCE> <WILDCARD> any eq 22
+ ! Refuse tout le reste et le journalise (le deny implicite existe déjà, mais sans log)
+ deny ip any any log
+! Applique l'ACL sur une interface
+interface <INTERFACE>
+ ! in = filtre le trafic entrant, out = le trafic sortant
+ ip access-group <ACL_NAME> in`,
+          show: `show access-lists
+show ip access-lists <ACL_NAME>
+show ip interface <INTERFACE> | include access list`,
+          troubleshoot: `show access-lists
+clear ip access-list counters`,
+          debug: `debug ip packet <ACL_NUMBER>`,
+        },
+        {
+          name: "Static / Default Routing",
+          level: "CCNA",
+          category: "",
+          prompt: "R1",
+          description:
+            "Une route statique indique à la main à un routeur par où envoyer le trafic vers un réseau donné. Simple et prévisible, elle convient aux petits réseaux ou aux liens uniques, mais ne s'adapte pas aux pannes. La route par défaut sert de sortie pour tout le trafic dont la destination est inconnue.",
+          config: `! Route statique : pour joindre ce réseau, passer par ce voisin (next-hop)
+ip route <NETWORK> <SUBNET_MASK> <NEXT_HOP>
+! Route par défaut : tout ce qui n'a pas de route plus précise part par là (vers Internet)
+ip route 0.0.0.0 0.0.0.0 <NEXT_HOP>`,
+          show: `show ip route
+show ip route static
+show running-config | include ip route`,
+          troubleshoot: `show ip route <NETWORK>
+ping <IP_ADDRESS>
+traceroute <IP_ADDRESS>`,
+          debug: ``,
+        },
+        {
+          name: "OSPF",
+          level: "CCNA",
+          category: "",
+          prompt: "R1",
+          description:
+            "OSPF est un protocole de routage dynamique à état de liens : chaque routeur connaît la carte du réseau et calcule lui-même le meilleur chemin, d'après un coût lié à la bande passante. Il converge vite et s'adapte aux pannes. Les routeurs sont regroupés en aires, l'aire 0 étant le cœur du réseau.",
+          config: `! Lance OSPF (le numéro de processus n'a qu'une valeur locale)
+router ospf <PROCESS_ID>
+ ! Identifiant unique du routeur, au format d'une adresse IP
+ router-id <ROUTER_ID>
+ ! Les interfaces dont l'IP est dans ce réseau participent à OSPF, dans cette aire
+ network <NETWORK> <WILDCARD> area <AREA>
+ ! N'envoie pas de messages OSPF sur cette interface (ex. côté LAN)
+ passive-interface <INTERFACE>
+ ! Annonce la route par défaut aux autres routeurs OSPF
+ default-information originate`,
+          show: `show ip ospf
+show ip ospf neighbor
+show ip ospf interface
+show ip route ospf
+show ip protocols`,
+          troubleshoot: `show ip ospf neighbor
+show ip ospf interface
+show ip route ospf
+debug ip ospf adj`,
+          debug: `debug ip ospf adj
+debug ip ospf events
+undebug all`,
+        },
+        {
+          name: "HSRP",
+          level: "CCNA",
+          category: "",
+          prompt: "R1",
+          description:
+            "HSRP donne une passerelle par défaut redondante : deux routeurs partagent une adresse IP virtuelle. L'un est actif et traite le trafic, l'autre prend le relais automatiquement en cas de panne, sans rien changer sur les PC. Il protège contre la panne du routeur de sortie.",
+          config: `interface <INTERFACE>
+ ! Version 2 : plus de groupes possibles et prise en charge de l'IPv6
+ standby version 2
+ ! Adresse IP virtuelle : c'est la passerelle à configurer sur les PC
+ standby <GROUP> ip <VIRTUAL_IP>
+ ! Priorité (100 par défaut) : la plus haute devient le routeur actif
+ standby <GROUP> priority <PRIORITY>
+ ! Reprend le rôle d'actif dès que ce routeur est de retour
+ standby <GROUP> preempt`,
+          show: `show standby
+show standby brief`,
+          troubleshoot: `show standby brief
+show ip interface brief`,
+          debug: `debug standby events
+debug standby errors`,
+        },
+        {
+          name: "IPv6 / NDP / SLAAC",
+          level: "CCNA",
+          category: "",
+          prompt: "R1",
+          description:
+            "IPv6 remplace IPv4 par des adresses de 128 bits et supprime le besoin de NAT. NDP remplace ARP pour trouver les voisins, et SLAAC permet à une machine de fabriquer elle-même son adresse à partir du préfixe annoncé par le routeur, sans serveur DHCP.",
+          config: `! Active le routage IPv6 (désactivé par défaut)
+ipv6 unicast-routing
+interface <INTERFACE>
+ ! Adresse IPv6 statique avec son préfixe /64
+ ipv6 address <IPV6_PREFIX>/64
+ ! Ou : l'interface se configure seule (SLAAC) à partir du préfixe annoncé par un routeur
+ ipv6 address autoconfig
+! Route par défaut IPv6
+ipv6 route ::/0 <NEXT_HOP>`,
+          show: `show ipv6 interface brief
+show ipv6 route
+show ipv6 neighbors`,
+          troubleshoot: `show ipv6 neighbors
+show ipv6 interface <INTERFACE>
+ping ipv6 <IPV6_ADDRESS>`,
+          debug: `debug ipv6 nd`,
+        },
+        {
+          name: "CDP / LLDP",
+          level: "CCNA",
+          category: "",
+          prompt: "SW1",
+          description:
+            "CDP (Cisco) et LLDP (standard) sont des protocoles de niveau 2 qui permettent à un équipement de découvrir ses voisins directs : nom, modèle, ports, adresse IP. Ils servent à cartographier un réseau et à vérifier un câblage. À désactiver sur les ports exposés, car ils révèlent des informations sur le matériel.",
+          config: `! Active CDP (propriétaire Cisco) sur tout l'équipement
+cdp run
+! Active LLDP (standard IEEE, compatible avec les autres constructeurs)
+lldp run
+interface <INTERFACE>
+ ! Désactive CDP sur ce port (ex. port exposé, pour ne rien révéler)
+ no cdp enable`,
+          show: `show cdp neighbors
+show cdp neighbors detail
+show lldp neighbors
+show lldp neighbors detail`,
+          troubleshoot: `show cdp interface
+show lldp interface`,
+          debug: ``,
+        },
+        {
+          name: "SSH",
+          level: "CCNA",
+          category: "sec",
+          prompt: "R1",
+          description:
+            "SSH permet d'administrer un équipement à distance de façon chiffrée, contrairement à Telnet qui envoie tout, mots de passe compris, en clair. Avant de l'activer, il faut un nom d'hôte, un nom de domaine, une paire de clés RSA et un compte utilisateur.",
+          config: `! Nom de domaine, nécessaire pour générer les clés (le hostname doit aussi avoir été changé)
+ip domain-name <DOMAIN>
+! Génère la paire de clés RSA (2048 bits conseillés)
+crypto key generate rsa modulus 2048
+! Compte local pour se connecter
+username <USER> secret <PASSWORD>
+! Impose SSH version 2, plus sûre
+ip ssh version 2
+! Lignes d'accès distant (0 à 15 = 16 sessions simultanées)
+line vty 0 15
+ ! Autorise uniquement SSH, pas Telnet
+ transport input ssh
+ ! Authentifie avec les comptes locaux
+ login local`,
+          show: `show ip ssh
+show ssh
+show crypto key mypubkey rsa`,
+          troubleshoot: `show line vty 0 15
+show ip ssh`,
+          debug: `debug ip ssh`,
+        },
+        {
+          name: "Port Security",
+          level: "CCNA",
+          category: "sec",
+          prompt: "SW1",
+          description:
+            "La sécurité de port limite quels équipements peuvent se brancher sur un port de switch, d'après leur adresse MAC. Elle empêche l'ajout d'un switch ou d'un PC non prévu et limite les attaques par saturation de la table MAC. En cas de violation, le port peut se couper, rejeter les trames ou seulement journaliser.",
+          config: `interface <INTERFACE>
+ ! Le port doit être en mode access (la sécurité de port ne marche pas en mode dynamique)
+ switchport mode access
+ ! Active la sécurité de port
+ switchport port-security
+ ! Nombre maximal d'adresses MAC autorisées sur le port
+ switchport port-security maximum 2
+ ! Apprend les MAC vues sur le port et les enregistre dans la configuration
+ switchport port-security mac-address sticky
+ ! En cas de violation, le port passe en err-disabled (coupé)
+ switchport port-security violation shutdown`,
+          show: `show port-security
+show port-security interface <INTERFACE>
+show port-security address`,
+          troubleshoot: `show interfaces status err-disabled
+show errdisable recovery`,
+          debug: ``,
+        },
+        {
+          name: "DHCP Snooping / DAI",
+          level: "CCNA",
+          category: "sec",
+          prompt: "SW1",
+          description:
+            "Le DHCP snooping bloque les faux serveurs DHCP en n'autorisant les réponses que sur les ports de confiance, et construit une table associant IP, MAC et port. DAI s'appuie sur cette table pour rejeter les paquets ARP falsifiés, ce qui protège contre l'ARP spoofing et les attaques de type man-in-the-middle.",
+          config: `! Active le DHCP snooping : le switch contrôle les messages DHCP
+ip dhcp snooping
+! VLAN à protéger
+ip dhcp snooping vlan <VLAN_ID>
+! Active l'inspection ARP dynamique (DAI) sur ce VLAN : vérifie les couples IP/MAC
+ip arp inspection vlan <VLAN_ID>
+! Port vers le serveur DHCP ou vers le reste du réseau
+interface <UPLINK_INTERFACE>
+ ! Port de confiance : les réponses DHCP y sont acceptées (les autres ports sont non fiables)
+ ip dhcp snooping trust
+ ! Port de confiance pour l'ARP : il n'est pas inspecté
+ ip arp inspection trust`,
+          show: `show ip dhcp snooping
+show ip dhcp snooping binding
+show ip arp inspection
+show ip arp inspection interfaces`,
+          troubleshoot: `show ip arp inspection statistics
+show interfaces status err-disabled`,
+          debug: `debug ip dhcp snooping event
+debug ip arp inspection`,
+        },
+        {
+          name: "EIGRP",
+          level: "ENCOR",
+          category: "",
+          prompt: "R1",
+          description:
+            "EIGRP est un protocole de routage propriétaire Cisco, de type vecteur de distance avancé. Il calcule la meilleure route avec une métrique composite (bande passante et délai) et garde une route de secours (feasible successor) pour basculer très vite. Les voisins doivent partager le même numéro d'AS.",
+          config: `! Lance EIGRP : le numéro d'AS doit être identique chez les voisins
+router eigrp <AS_NUMBER>
+ ! Identifiant du routeur
+ eigrp router-id <ROUTER_ID>
+ ! Interfaces concernées par EIGRP (réseau et wildcard)
+ network <NETWORK> <WILDCARD>
+ ! N'envoie pas de messages EIGRP vers cette interface (ex. côté LAN)
+ passive-interface <INTERFACE>
+ ! Désactive le résumé automatique des réseaux par classe
+ no auto-summary`,
+          show: `show ip eigrp neighbors
+show ip eigrp topology
+show ip route eigrp
+show ip protocols`,
+          troubleshoot: `show ip eigrp neighbors
+show ip eigrp interfaces
+show ip eigrp topology all-links`,
+          debug: `debug eigrp packets
+debug ip eigrp`,
+        },
+        {
+          name: "BGP",
+          level: "ENCOR",
+          category: "",
+          prompt: "R1",
+          description:
+            "BGP est le protocole de routage d'Internet : il échange les routes entre systèmes autonomes (AS), par exemple entre un opérateur et ses clients. Il choisit les routes selon des politiques (attributs, préférences) plutôt que selon la vitesse. eBGP relie des AS différents, iBGP des routeurs d'un même AS.",
+          config: `! Lance BGP avec le numéro de ton système autonome (AS)
+router bgp <LOCAL_AS>
+ ! Identifiant du routeur
+ bgp router-id <ROUTER_ID>
+ ! Déclare un voisin et son AS : eBGP si l'AS est différent, iBGP s'il est identique
+ neighbor <PEER_IP> remote-as <REMOTE_AS>
+ ! Annonce ce réseau (il doit déjà être dans la table de routage)
+ network <NETWORK> mask <SUBNET_MASK>`,
+          show: `show ip bgp summary
+show ip bgp
+show ip bgp neighbors
+show ip route bgp`,
+          troubleshoot: `show ip bgp summary
+show ip bgp neighbors <PEER_IP> advertised-routes
+show ip bgp neighbors <PEER_IP> received-routes`,
+          debug: `debug ip bgp updates
+debug ip bgp events
+clear ip bgp <PEER_IP> soft`,
+        },
+        {
+          name: "Route Maps / Redistribution",
+          level: "ENCOR",
+          category: "",
+          prompt: "R1",
+          description:
+            "La redistribution injecte les routes apprises par un protocole (par exemple EIGRP) dans un autre (par exemple OSPF) pour relier deux domaines de routage. Une route-map sert à filtrer et à modifier ces routes (métrique, tags...) au passage, afin d'éviter les boucles et les annonces non voulues.",
+          config: `! Route-map : règles évaluées dans l'ordre (10, 20...), sur le principe « si condition, alors action »
+route-map <MAP_NAME> permit 10
+ ! Condition : ne concerne que les routes autorisées par cette ACL
+ match ip address <ACL_NAME>
+ ! Action : modifie la métrique de ces routes
+ set metric <VALUE>
+router ospf <PROCESS_ID>
+ ! Injecte dans OSPF les routes EIGRP en appliquant la route-map ; subnets inclut les sous-réseaux
+ redistribute eigrp <AS_NUMBER> subnets route-map <MAP_NAME>`,
+          show: `show route-map
+show ip protocols
+show ip route`,
+          troubleshoot: `show route-map <MAP_NAME>
+show ip ospf database external`,
+          debug: ``,
+        },
+        {
+          name: "VRF",
+          level: "ENCOR",
+          category: "",
+          prompt: "R1",
+          description:
+            "Une VRF crée plusieurs tables de routage séparées sur un même routeur, comme des routeurs virtuels isolés. On peut ainsi héberger des clients ou des services différents, même avec des plages d'adresses qui se chevauchent, sans qu'ils puissent communiquer entre eux. Les commandes de test doivent préciser la VRF.",
+          config: `! Crée une table de routage indépendante (VRF)
+vrf definition <VRF_NAME>
+ ! Active IPv4 dans cette VRF
+ address-family ipv4
+interface <INTERFACE>
+ ! Place l'interface dans la VRF (à faire avant l'adresse IP, qui est effacée sinon)
+ vrf forwarding <VRF_NAME>
+ ip address <IP_ADDRESS> <SUBNET_MASK>`,
+          show: `show vrf
+show ip route vrf <VRF_NAME>
+show ip interface brief vrf <VRF_NAME>`,
+          troubleshoot: `ping vrf <VRF_NAME> <IP_ADDRESS>
+traceroute vrf <VRF_NAME> <IP_ADDRESS>`,
+          debug: ``,
+        },
+        {
+          name: "NTP / Syslog / SNMP",
+          level: "CCNA",
+          category: "svc",
+          prompt: "R1",
+          description:
+            "Ces trois services servent à exploiter le réseau : NTP garde les horloges synchronisées, Syslog centralise les messages des équipements et SNMP permet à un outil de supervision de lire leur état. Sans heure exacte, les journaux de plusieurs équipements ne peuvent pas être comparés lors d'un incident.",
+          config: `! NTP : se synchronise sur un serveur de temps
+ntp server <NTP_SERVER_IP>
+! Syslog : envoie les journaux à un serveur central
+logging host <SYSLOG_IP>
+! Niveau minimal des messages envoyés (informational = 6)
+logging trap informational
+! Horodate chaque message de log avec la date, l'heure et les millisecondes
+service timestamps log datetime msec
+! SNMP : communauté en lecture seule (ro) pour la supervision ; préfère SNMPv3 en production
+snmp-server community <COMMUNITY> ro`,
+          show: `show ntp status
+show ntp associations
+show logging
+show snmp`,
+          troubleshoot: `show clock detail
+show ntp associations detail`,
+          debug: `debug ntp packets`,
+        },
+        {
+          name: "AAA / RADIUS / TACACS+",
+          level: "ENCOR",
+          category: "sec",
+          prompt: "R1",
+          description:
+            "AAA centralise la gestion des accès : Authentication (qui es-tu ?), Authorization (que peux-tu faire ?) et Accounting (qu'as-tu fait ?). RADIUS et TACACS+ relient l'équipement à un serveur central, pour ne pas gérer de comptes sur chaque machine. Garde toujours un compte local de secours.",
+          config: `! Active le modèle AAA
+aaa new-model
+! Déclare le serveur RADIUS
+radius server <NAME>
+ ! Adresse du serveur et ports d'authentification et de comptabilité
+ address ipv4 <SERVER_IP> auth-port 1812 acct-port 1813
+ ! Secret partagé avec le serveur
+ key <SECRET>
+! Connexion : essaie RADIUS, puis les comptes locaux si le serveur ne répond pas
+aaa authentication login default group radius local`,
+          show: `show aaa servers
+show radius statistics
+show running-config | section aaa`,
+          troubleshoot: `test aaa group radius <USER> <PASSWORD> new-code`,
+          debug: `debug aaa authentication
+debug radius`,
+        },
+      ];
+
+      // Les 4 types de blocs d'une fiche : clé -> libellé affiché.
+      const TYPES = { C: "CONFIG", S: "SHOW", T: "TROUBLESHOOT", D: "DEBUG" };
+      // Entrées du menu latéral : [identifiant de la vue, libellé].
+      // Les vues CCNA / ENCOR / sec / svc filtrent les fiches ; TS, ALL, FAV et TRAIN sont des vues spéciales.
+      const NAV = [
+        ["all", "Tout"],
+        ["CCNA", "CCNA"],
+        ["ENCOR", "CCNP ENCOR"],
+        ["sec", "Security"],
+        ["svc", "Services"],
+        ["TS", "Troubleshooting"],
+        ["ALL", "All commands"],
+        ["FAV", "⭐ Favoris"],
+        ["TRAIN", "🎯 Entraînement"],
+      ];
+      // Raccourci pour document.querySelector.
+      const $ = (s) => document.querySelector(s);
+      // État de l'application : vue active, recherche, types filtrés, favoris et historique de recherche.
+      const st = { view: "all", q: "", types: new Set(), favs: [], rec: [] };
+      // Lecture / écriture dans localStorage (sans planter si le navigateur le bloque).
+      const ls = {
+        get(k, d) {
+          try {
+            return JSON.parse(localStorage.getItem(k)) || d;
+          } catch (e) {
+            return d;
+          }
+        },
+        set(k, v) {
+          try {
+            localStorage.setItem(k, JSON.stringify(v));
+          } catch (e) {}
+        },
+      };
+      st.favs = ls.get("favs", []);
+      st.rec = ls.get("rec", []);
+      // Échappe le HTML pour afficher du texte brut sans risque.
+      const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      // Coloration syntaxique d'une ligne : commentaires (!), <VARIABLES>, nombres/IP et premier mot (la commande).
+      function hl(l) {
+        if (l.trim().startsWith("!")) return `<span class="cm">${esc(l)}</span>`;
+        let h = esc(l).replace(/(&lt;[A-Z_0-9]+&gt;)|(\b\d[\d.\/:]*\b)/g, (m, v, n) =>
+          v ? `<span class="vr">${v}</span>` : `<span class="nm">${n}</span>`,
+        );
+        return h.replace(/^(\s*)([a-z][\w-]*)/, '$1<span class="k">$2</span>');
+      }
+      // Une ligne de commande avec son bouton favori (★/☆). Les lignes indentées et les commentaires n'en ont pas.
+      function line(l) {
+        const cmd = !l.startsWith(" ") && !l.trim().startsWith("!");
+        const f = st.favs.includes(l);
+        return `<div class="l"><span class="t">${hl(l) || " "}</span>${cmd ? `<button class="st ${f ? "f" : ""}" data-fav="${encodeURIComponent(l)}" title="Favori">${f ? "★" : "☆"}</button>` : ""}</div>`;
+      }
+      // Un bloc de commandes (CONFIG, SHOW, TROUBLESHOOT ou DEBUG) avec son bouton Copy.
+      function blk(type, ls_, prompt) {
+        if (!ls_.length) return "";
+        return `
+    <div class="blk">
+      <div class="bh ${type}">
+        <span>${TYPES[type]}</span>
+        <em>${prompt}${type == "C" ? "(config)" : ""}#</em>
+        <button data-copy="${encodeURIComponent(ls_.join("\n"))}">Copy</button>
+      </div>
+      <pre>${ls_.map(line).join("")}</pre>
+    </div>`;
+      }
+      // Découpe la recherche en mots : tous doivent être présents pour qu'une commande corresponde.
+      function tokens() {
+        return st.q.toLowerCase().split(/\s+/).filter(Boolean);
+      }
+      // Affiche la zone principale selon la vue active et la recherche.
+      // Si le nom ou la description d'une fiche correspond, toute la fiche s'affiche ; sinon seules les lignes qui correspondent.
+      function render() {
+        if (st.view == "TRAIN") return train();
+        const tk = tokens(),
+          out = [];
+        const types = st.types.size ? [...st.types] : Object.keys(TYPES);
+        let items = D.filter(
+          (t) =>
+            st.view == "all" ||
+            st.view == "TS" ||
+            st.view == "ALL" ||
+            st.view == "FAV" ||
+            t.level == st.view ||
+            t.category == st.view,
+        );
+        if (st.view == "FAV") {
+          let f = st.favs.filter((c) => tk.every((x) => c.toLowerCase().includes(x)));
+          $("#out").innerHTML = f.length
+            ? `<div class="card"><div class="blk"><div class="bh S"><span>FAVORIS</span><button data-copy="${encodeURIComponent(f.join("\n"))}">Copy</button></div><pre>${f.map(line).join("")}</pre></div></div>`
+            : `<div class="empty">Aucun favori. Clique sur ☆ à côté d'une commande pour l'ajouter.</div>`;
+          return;
+        }
+        if (st.view == "ALL") {
+          const seen = new Set(),
+            all = [];
+          D.forEach((t) =>
+            [t.show, t.troubleshoot].forEach((txt) =>
+              txt.split("\n").forEach((l) => {
+                if (
+                  l &&
+                  !seen.has(l) &&
+                  (!tk.length || tk.every((x) => l.toLowerCase().includes(x)))
+                ) {
+                  seen.add(l);
+                  all.push(l);
+                }
+              }),
+            ),
+          );
+          $("#out").innerHTML =
+            `<div class="card"><h2>SHOW COMMANDS <span class="tag">${all.length}</span></h2><div class="blk"><div class="bh S"><span>SHOW</span><button data-copy="${encodeURIComponent(all.join("\n"))}">Copy</button></div><pre>${all.map(line).join("")}</pre></div></div>`;
+          return;
+        }
+        items.forEach((t) => {
+          const { name: n, level: lv, category: cat, description: desc } = t,
+            secs = { C: t.config, S: t.show, T: t.troubleshoot, D: t.debug };
+          const th = (n + " " + lv + " " + cat + " " + desc).toLowerCase();
+          const hit = tk.length && tk.every((x) => th.includes(x));
+          let body = "";
+          (st.view == "TS" ? ["T", "D"] : types).forEach((k) => {
+            let L = secs[k].split("\n").filter(Boolean);
+            if (tk.length && !hit)
+              L = L.filter((l) => tk.every((x) => (l + " " + n).toLowerCase().includes(x)));
+            body += blk(k, L, t.prompt);
+          });
+          if (body)
+            out.push(`
+      <div class="card">
+        <h2>
+          ${n}
+          <span class="tag ${lv}">${lv}</span>
+          ${cat ? `<span class="tag">${cat == "sec" ? "SECURITY" : "SERVICES"}</span>` : ""}
+        </h2>
+        <p>${desc}</p>
+        ${body}
+      </div>`);
+        });
+        $("#out").innerHTML = out.length
+          ? `<div class="grid">${out.join("")}</div>`
+          : `<div class="empty">Aucune commande ne correspond à « ${esc(st.q)} ». Essaie un seul mot, comme « ospf » ou « vlan ».</div>`;
+      }
+      // Redessine le menu, les filtres, l'historique, puis le contenu.
+      function ui() {
+        $("#nav").innerHTML = NAV.map(
+          ([k, l]) => `<button class="${st.view == k ? "on" : ""}" data-v="${k}">${l}</button>`,
+        ).join("");
+        const T_ = st.view == "TRAIN";
+        document.querySelector(".prompt").style.display = T_ ? "none" : "";
+        $("#flt").innerHTML = T_
+          ? "Difficulté :" +
+            DIFF.map(
+              ([k, l]) => `<button class="${tr.mode == k ? "on" : ""}" data-d="${k}">${l}</button>`,
+            ).join("")
+          : "Type :" +
+            Object.entries(TYPES)
+              .map(
+                ([k, l]) =>
+                  `<button class="${st.types.has(k) ? "on" : ""}" data-t="${k}">${l}</button>`,
+              )
+              .join("");
+        $("#rec").innerHTML =
+          st.rec.length && !T_
+            ? "Récent :" +
+              st.rec
+                .map((r) => `<button data-r="${encodeURIComponent(r)}">${esc(r)}</button>`)
+                .join("")
+            : "";
+        render();
+      }
+      // Copie le texte dans le presse-papiers (avec une solution de secours pour les anciens navigateurs).
+      function copy(t, b) {
+        const ok = () => {
+          const o = b.textContent;
+          b.textContent = "Copié ✓";
+          setTimeout(() => (b.textContent = o), 1200);
+        };
+        const fb = () => {
+          const a = document.createElement("textarea");
+          a.value = t;
+          document.body.appendChild(a);
+          a.select();
+          try {
+            document.execCommand("copy");
+            ok();
+          } catch (e) {}
+          a.remove();
+        };
+        navigator.clipboard ? navigator.clipboard.writeText(t).then(ok, fb) : fb();
+      }
+      // Gestion centralisée des clics, d'après l'attribut data-* du bouton :
+      // data-copy, data-fav, data-v (vue), data-t (type), data-r (recherche récente), data-d (difficulté), data-a (action d'entraînement).
+      document.addEventListener("click", (e) => {
+        const b = e.target.closest("button");
+        if (!b) return;
+        if (b.dataset.copy) return copy(decodeURIComponent(b.dataset.copy), b);
+        if (b.dataset.fav) {
+          const c = decodeURIComponent(b.dataset.fav),
+            i = st.favs.indexOf(c);
+          i < 0 ? st.favs.push(c) : st.favs.splice(i, 1);
+          ls.set("favs", st.favs);
+          return render();
+        }
+        if (b.dataset.v) {
+          st.view = b.dataset.v;
+          return ui();
+        }
+        if (b.dataset.t) {
+          st.types.has(b.dataset.t) ? st.types.delete(b.dataset.t) : st.types.add(b.dataset.t);
+          return ui();
+        }
+        if (b.dataset.r) {
+          $("#q").value = st.q = decodeURIComponent(b.dataset.r);
+          return render();
+        }
+        if (b.dataset.d) {
+          tr.mode = b.dataset.d;
+          newEx();
+          return ui();
+        }
+        if (b.dataset.a) return act(b.dataset.a);
+        if (b.id == "th") {
+          const d = document.documentElement,
+            dark = d.dataset.theme
+              ? d.dataset.theme == "dark"
+              : matchMedia("(prefers-color-scheme:dark)").matches;
+          d.dataset.theme = dark ? "light" : "dark";
+        }
+      });
+      // Barre de recherche : filtre à chaque frappe, mémorise la recherche à la validation.
+      const q = $("#q");
+      q.addEventListener("input", () => {
+        st.q = q.value;
+        render();
+      });
+      q.addEventListener("change", () => {
+        const v = q.value.trim();
+        if (v) {
+          st.rec = [v, ...st.rec.filter((x) => x != v)].slice(0, 8);
+          ls.set("rec", st.rec);
+          $("#rec").innerHTML =
+            "Récent :" +
+            st.rec
+              .map((r) => `<button data-r="${encodeURIComponent(r)}">${esc(r)}</button>`)
+              .join("");
+        }
+      });
+      // Raccourci clavier : "/" place le curseur dans la barre de recherche.
+      document.addEventListener("keydown", (e) => {
+        if (e.key == "/" && !document.activeElement.matches("input")) {
+          e.preventDefault();
+          q.focus();
+        }
+      });
+      // ================= MODE ENTRAÎNEMENT =================
+      // Un protocole est tiré au hasard ; certaines lignes de sa configuration sont à retrouver.
+      const DIFF = [
+        ["easy", "Facile"],
+        ["mid", "Moyen"],
+        ["hard", "Difficile"],
+      ];
+      const sv = ls.get("score", {});
+      // État de l'entraînement : difficulté, exercice en cours, score (sauvegardé dans le navigateur).
+      const tr = {
+        mode: "easy",
+        ex: null,
+        done: false,
+        ok: sv.ok || 0,
+        tot: sv.tot || 0,
+        streak: sv.streak || 0,
+        best: sv.best || 0,
+        base: null,
+        sol: false,
+        first: false,
+      };
+      // Tire un nouveau protocole et choisit les lignes à masquer selon la difficulté.
+      function newEx() {
+        const pool = D.filter(
+          (t) => t.config.split("\n").filter((l) => l && !l.trim().startsWith("!")).length >= 3,
+        );
+        let t;
+        do {
+          t = pool[Math.floor(Math.random() * pool.length)];
+        } while (pool.length > 1 && tr.ex && tr.ex.t === t);
+        const L = t.config.split("\n").filter(Boolean);
+        const cand = L.map((l, i) => i).filter((i) => !L[i].trim().startsWith("!"));
+        const n = Math.max(
+          2,
+          Math.round(cand.length * { easy: 0.34, mid: 0.67, hard: 1 }[tr.mode]),
+        );
+        const pick = new Set(
+          cand.sort(() => Math.random() - 0.5).slice(0, Math.min(n, cand.length)),
+        );
+        tr.ex = { t, L, pick };
+        tr.done = false;
+        tr.base = null;
+        tr.sol = false;
+        tr.first = false;
+      }
+      // Affiche l'exercice : lignes fixes + champs de saisie pour les lignes masquées.
+      function train() {
+        if (!tr.ex) newEx();
+        const { t, L, pick } = tr.ex;
+        const rows = L.map((l, i) => {
+          if (!pick.has(i)) return `<div class="l"><span class="t">${hl(l) || " "}</span></div>`;
+          const ind = l.length - l.trimStart().length;
+          return `<div class="l tr"><span class="ind">${" ".repeat(ind)}</span><input data-i="${i}" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Ligne ${i + 1}"><span class="mk"></span></div>`;
+        }).join("");
+        $("#out").innerHTML = `
+    <div class="card tcard">
+      <h2>${t.name} <span class="tag ${t.level}">${t.level}</span></h2>
+      <p>
+        ${t.description} Complète les lignes vides. Les abréviations IOS (int gi0/1)
+        sont acceptées, et n'importe quelle valeur remplace une
+        <span class="vr">&lt;VARIABLE&gt;</span>.
+      </p>
+      <div class="blk">
+        <div class="bh C">
+          <span>CONFIG</span>
+          <em>${t.prompt}(config)#</em>
+          <b class="sc"></b>
+        </div>
+        <pre>${rows}</pre>
+      </div>
+      <div class="acts">
+        <button class="pri" data-a="check">Vérifier</button>
+        <button data-a="hint">Indice</button>
+        <button data-a="sol">Solution</button>
+        <button data-a="next">Autre protocole</button>
+        <button data-a="reset">Remettre le score à zéro</button>
+      </div>
+      <div id="fb" class="fb"></div>
+    </div>`;
+        score();
+        const f = document.querySelector(".tr input");
+        if (f && matchMedia("(hover:hover)").matches) f.focus();
+      }
+      // Compare un mot attendu (e) à un mot saisi (u) : accepte les <VARIABLES>, les abréviations IOS (gi0/1) et ignore la casse.
+      function wordOK(e, u) {
+        if (/<[A-Z_0-9]+>/.test(e))
+          return new RegExp(
+            "^" +
+              e
+                .split(/(<[A-Z_0-9]+>)/)
+                .map((p, i) => (i % 2 ? ".+" : p.replace(/[.*+?^${}()|[\]\\\/]/g, "\\$&")))
+                .join("") +
+              "$",
+            "i",
+          ).test(u);
+        e = e.toLowerCase();
+        u = u.toLowerCase();
+        if (e == u) return true;
+        const a = e.match(/^([a-z-]+)(.*)$/),
+          b = u.match(/^([a-z-]+)(.*)$/);
+        return !!(a && b && b[1].length >= 2 && a[1].startsWith(b[1]) && a[2] == b[2]);
+      }
+      // Une ligne est correcte si elle a le même nombre de mots et que chaque mot est accepté.
+      function lineOK(e, u) {
+        const E = e.trim().split(/\s+/),
+          U = u.trim().split(/\s+/);
+        return E.length == U.length && E.every((w, i) => wordOK(w, U[i]));
+      }
+      // Colore un champ (ok / ko / sol) et affiche ✓ ou ✗.
+      function mark(i, c) {
+        i.className = c;
+        i.nextElementSibling.textContent = c == "ko" ? "✗" : c == "ok" ? "✓" : "";
+      }
+      function fb(m) {
+        document.getElementById("fb").textContent = m;
+      }
+      function score() {
+        const e = document.querySelector(".sc");
+        if (e)
+          e.textContent =
+            "Score " +
+            tr.ok +
+            "/" +
+            tr.tot +
+            (tr.tot ? " (" + Math.round((100 * tr.ok) / tr.tot) + "%)" : "") +
+            " · série " +
+            tr.streak +
+            " · record " +
+            tr.best;
+        ls.set("score", { ok: tr.ok, tot: tr.tot, streak: tr.streak, best: tr.best });
+      }
+      // Actions des boutons : next, reset, hint, sol (solution) et check (vérifier + mise à jour du score).
+      function act(a) {
+        if (a == "next") {
+          newEx();
+          return train();
+        }
+        if (a == "reset") {
+          tr.ok = tr.tot = tr.streak = tr.best = 0;
+          tr.base = null;
+          score();
+          return fb("Score remis à zéro.");
+        }
+        const ins = [...document.querySelectorAll(".tr input")],
+          L = tr.ex.L;
+        if (a == "hint")
+          return ins.forEach((i) => {
+            if (!i.value) i.placeholder = L[i.dataset.i].trim().split(/\s+/)[0] + " …";
+          });
+        if (a == "sol") {
+          ins.forEach((i) => {
+            i.value = L[i.dataset.i].trim();
+            mark(i, "sol");
+          });
+          tr.done = true;
+          tr.sol = true;
+          if (!tr.base) {
+            tr.base = { ok: tr.ok, tot: tr.tot, streak: tr.streak };
+            tr.tot += ins.length;
+          }
+          tr.streak = 0;
+          score();
+          return fb(
+            "Solution affichée : cet exercice ne rapporte aucun point. Relis chaque ligne, puis passe à un autre protocole.",
+          );
+        }
+        if (ins.every((i) => !i.value.trim()))
+          return fb("Remplis au moins une ligne avant de vérifier.");
+        let ok = 0;
+        ins.forEach((i) => {
+          const g = lineOK(L[i.dataset.i], i.value);
+          if (g) ok++;
+          mark(i, g ? "ok" : "ko");
+        });
+        if (!tr.sol) {
+          if (!tr.base) {
+            tr.base = { ok: tr.ok, tot: tr.tot, streak: tr.streak };
+            tr.first = ok == ins.length;
+          }
+          tr.done = true;
+          tr.ok = tr.base.ok + ok;
+          tr.tot = tr.base.tot + ins.length;
+          tr.streak = tr.first ? tr.base.streak + 1 : 0;
+          tr.best = Math.max(tr.best, tr.streak);
+          score();
+        }
+        fb(
+          ok == ins.length
+            ? "Parfait, toutes les lignes sont correctes."
+            : ok +
+                "/" +
+                ins.length +
+                " correctes. Corrige les lignes en rouge, puis vérifie à nouveau.",
+        );
+      }
+      document.addEventListener("keydown", (e) => {
+        if (e.key != "Enter" || !e.target.matches || !e.target.matches(".tr input")) return;
+        const a = [...document.querySelectorAll(".tr input")],
+          i = a.indexOf(e.target);
+        e.preventDefault();
+        i < a.length - 1 ? a[i + 1].focus() : act("check");
+      });
+      // Démarrage.
+      ui();
+    </script>
+  </body>
+</html>
