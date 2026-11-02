@@ -432,37 +432,107 @@
         text-align: center;
         font-size: 16px;
       }
-      /* Mobile : le menu passe en bandeau horizontal */
+      /* ===== Tablette / mobile : la barre latérale devient un en-tête horizontal ===== */
       @media (max-width: 820px) {
         .app {
           flex-direction: column;
         }
+        /* En-tête : logo + titre sur une ligne, menu en onglets défilants en dessous */
         aside {
           width: auto;
           position: static;
           max-height: none;
-          flex-direction: row;
+          flex-flow: row wrap;
           align-items: center;
-          gap: 10px;
+          gap: 10px 14px;
           padding: calc(12px + env(safe-area-inset-top, 0px)) 14px 10px;
-          overflow-x: auto;
         }
-        .brand small,
-        .brand div {
+        .brand {
+          flex: 1;
+          font-size: 18px;
+          padding: 0;
+        }
+        /* Garde le titre visible (seul le sous-titre est masqué, faute de place) */
+        .brand small {
           display: none;
         }
+        .brand div {
+          font-size: 16px;
+          line-height: 1.1;
+        }
+        /* Le menu occupe toute la largeur sous l'en-tête et défile horizontalement */
         nav {
+          order: 3;
+          flex-basis: 100%;
           flex-direction: row;
+          gap: 6px;
+          overflow-x: auto;
+          margin: 0 -14px;
+          padding: 2px 14px;
+          scrollbar-width: none;
+        }
+        nav::-webkit-scrollbar {
+          display: none;
         }
         nav button {
           white-space: nowrap;
+          padding: 8px 14px;
         }
         #th {
-          margin: 0 0 0 auto;
+          margin: 0;
           white-space: nowrap;
         }
         .grid {
           columns: 1;
+        }
+      }
+      /* ===== Téléphone : marges resserrées et zones tactiles agrandies ===== */
+      @media (max-width: 480px) {
+        main {
+          padding-bottom: 48px;
+        }
+        .hero {
+          padding-top: calc(12px + env(safe-area-inset-top, 0px));
+        }
+        /* Barre de recherche plus compacte (16px = pas de zoom auto sur iOS) */
+        .prompt {
+          padding: 0 14px;
+          gap: 9px;
+        }
+        .prompt b {
+          font-size: 15px;
+        }
+        #q {
+          font-size: 16px;
+          padding: 14px 0;
+        }
+        /* Filtres et récents : puces un peu plus grandes, plus faciles à toucher */
+        .bar {
+          gap: 6px;
+        }
+        #flt button {
+          padding: 7px 13px;
+        }
+        /* Cartes : moins de marge interne pour gagner de la largeur */
+        .card {
+          padding: 16px 13px 12px;
+          border-radius: 14px;
+        }
+        .card h2 {
+          font-size: 20px;
+        }
+        /* Blocs de code : on garde le défilement horizontal mais on resserre */
+        .l {
+          padding: 0 10px;
+        }
+        pre {
+          font-size: 12.5px;
+        }
+        /* Entraînement : boutons sur deux colonnes, plus faciles à viser */
+        .acts button {
+          flex: 1;
+          min-width: calc(50% - 4px);
+          text-align: center;
         }
       }
       /* ===== Mode entraînement ===== */
