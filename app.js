@@ -190,8 +190,18 @@ function copy(t, b) {
 // Gestion centralisée des clics, d'après l'attribut data-* du bouton :
 // data-copy, data-fav, data-v (vue), data-t (type), data-r (recherche récente), data-d (difficulté), data-a (action d'entraînement).
 document.addEventListener("click", (e) => {
+  const aside = $("aside");
   const b = e.target.closest("button");
+  // Menu mobile : se referme si on clique en dehors de la barre latérale
+  if (aside.classList.contains("open") && !e.target.closest("aside"))
+    aside.classList.remove("open");
   if (!b) return;
+  // Bouton hamburger : ouvre / ferme le menu déroulant
+  if (b.id == "burger") {
+    const open = aside.classList.toggle("open");
+    b.setAttribute("aria-expanded", open);
+    return;
+  }
   if (b.dataset.copy) return copy(decodeURIComponent(b.dataset.copy), b);
   if (b.dataset.fav) {
     const c = decodeURIComponent(b.dataset.fav),
@@ -202,6 +212,7 @@ document.addEventListener("click", (e) => {
   }
   if (b.dataset.v) {
     st.view = b.dataset.v;
+    aside.classList.remove("open"); // referme le menu après le choix
     return ui();
   }
   if (b.dataset.t) {
