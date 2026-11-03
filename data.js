@@ -619,4 +619,35 @@ show running-config | section aaa`,
     debug: `debug aaa authentication
 debug radius`,
   },
+  {
+    name: "PVLAN",
+    level: "ENCOR",
+    category: "",
+    prompt: "SW1",
+    description:
+      "Un PVLAN (Private VLAN) isole les ports d'un même VLAN entre eux, tout en leur permettant de communiquer avec un port promiscuous. Il sert à héberger plusieurs clients sur un même VLAN sans qu'ils puissent se parler, par exemple dans un datacenter ou un hôtel.",
+    config: `! Crée le VLAN primaire et le VLAN secondaire (isolé ou communautaire)
+vlan <PRIMARY_VLAN>
+ private-vlan primary
+vlan <SECONDARY_VLAN>
+ private-vlan isolated
+! Associe le VLAN secondaire au VLAN primaire
+vlan <PRIMARY_VLAN>
+ private-vlan association <SECONDARY_VLAN>
+! Configure le port promiscuous : il peut parler à tous les ports du PVLAN
+interface <PROMISCUOUS_INTERFACE>
+ switchport mode private-vlan promiscuous
+ switchport private-vlan mapping <SECONDARY_VLAN>
+! Configure le port isolé : il ne peut parler qu'au port promiscuous
+interface <ISOLATED_INTERFACE>
+ switchport mode private-vlan host
+ switchport private-vlan host-association <PRIMARY_VLAN> <SECONDARY_VLAN>`,
+    show: `show vlan private-vlan
+show interfaces <INTERFACE> switchport
+show mac address-table`,
+    troubleshoot: `show vlan private-vlan
+show interfaces <INTERFACE> switchport
+show mac address-table`,
+    debug: ``,
+  }
 ];
