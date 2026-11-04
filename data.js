@@ -649,5 +649,36 @@ show mac address-table`,
 show interfaces <INTERFACE> switchport
 show mac address-table`,
     debug: ``,
+  },
+  {
+    name: VOIP,
+    level: "ENCOR",
+    category: "svc",
+    prompt: "SW1",
+    description:
+      "La VoIP (Voice over IP) transporte la voix sur le réseau IP. Elle nécessite une qualité de service (QoS) pour que la voix ne soit pas dégradée par le trafic de données. Les VLANs séparés pour la voix et les données, ainsi que la priorisation des paquets voix, sont des pratiques courantes.",
+    config: `! Crée un VLAN pour la voix
+vlan <VOICE_VLAN>
+ name Voice
+! Configure le port pour la VoIP : mode access et VLAN voix
+interface <INTERFACE>
+ switchport mode access
+ switchport access vlan <DATA_VLAN>
+ switchport voice vlan <VOICE_VLAN>
+! Configure le port pour la VoIP : mode trunk et VLAN voix
+interface <INTERFACE>
+ switchport mode trunk
+ switchport trunk native vlan <DATA_VLAN>
+ switchport trunk allowed vlan <DATA_VLAN>,<VOICE_VLAN>
+ switchport voice vlan <VOICE_VLAN>
+! Active QoS pour prioriser les paquets voix
+mls qos`,
+    show: `show vlan brief
+show interfaces <INTERFACE> switchport
+show mls qos interface`,
+    troubleshoot: `show vlan brief
+show interfaces <INTERFACE> switchport
+show mls qos interface`,
+    debug: ``,
   }
 ];
