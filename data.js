@@ -651,7 +651,7 @@ show mac address-table`,
     debug: ``,
   },
   {
-    name: VOIP,
+    name: "VOIP",
     level: "ENCOR",
     category: "svc",
     prompt: "SW1",
