@@ -1,8 +1,9 @@
 // Les 4 types de blocs d'une fiche : clé -> libellé affiché.
 const TYPES = { C: "CONFIG", S: "SHOW", T: "TROUBLESHOOT", D: "DEBUG" };
 // Entrées du menu latéral : [identifiant de la vue, libellé].
-// Les vues CCNA / ENCOR / sec / svc filtrent les fiches ; TS, ALL, FAV et TRAIN sont des vues spéciales.
+// Les vues CCNA / ENCOR / sec / svc filtrent les fiches ; GUIDE, TS, ALL, FAV et TRAIN sont des vues spéciales.
 const NAV = [
+  ["GUIDE", "📘 Guide"],
   ["all", "Tout"],
   ["CCNA", "CCNA"],
   ["ENCOR", "CCNP ENCOR"],
@@ -16,7 +17,8 @@ const NAV = [
 // Raccourci pour document.querySelector.
 const $ = (s) => document.querySelector(s);
 // État de l'application : vue active, recherche, types filtrés, favoris et historique de recherche.
-const st = { view: "all", q: "", types: new Set(), favs: [], rec: [] };
+// gid : fiche ouverte dans le Guide ; open : prérequis dont l'aperçu est déplié.
+const st = { view: "GUIDE", q: "", types: new Set(), favs: [], rec: [], gid: null, open: new Set() };
 // Lecture / écriture dans localStorage (sans planter si le navigateur le bloque).
 const ls = {
   get(k, d) {
@@ -71,6 +73,7 @@ function tokens() {
 // Si le nom ou la description d'une fiche correspond, toute la fiche s'affiche ; sinon seules les lignes qui correspondent.
 function render() {
   if (st.view == "TRAIN") return train();
+  if (st.view == "GUIDE") return guide();
   const tk = tokens(),
     out = [];
   const types = st.types.size ? [...st.types] : Object.keys(TYPES);
@@ -146,7 +149,7 @@ function ui() {
   ).join("");
   const T_ = st.view == "TRAIN";
   document.querySelector(".prompt").style.display = T_ ? "none" : "";
-  $("#flt").innerHTML = T_
+  $("#flt").innerHTML = st.view == "GUIDE" ? "" : T_
     ? "Difficulté :" +
       DIFF.map(
         ([k, l]) => `<button class="${tr.mode == k ? "on" : ""}" data-d="${k}">${l}</button>`,
@@ -165,6 +168,8 @@ function ui() {
           .map((r) => `<button data-r="${encodeURIComponent(r)}">${esc(r)}</button>`)
           .join("")
       : "";
+  // Hauteur de la zone de recherche collante : la liste du Guide se colle juste en dessous.
+  document.documentElement.style.setProperty("--hh", $(".hero").offsetHeight + "px");
   render();
 }
 // Copie le texte dans le presse-papiers (avec une solution de secours pour les anciens navigateurs).
@@ -213,7 +218,14 @@ document.addEventListener("click", (e) => {
   if (b.dataset.v) {
     st.view = b.dataset.v;
     aside.classList.remove("open"); // referme le menu après le choix
+    // L'URL suit la vue : #guide/<id> dans le Guide, rien ailleurs.
+    if (st.view == "GUIDE") history.pushState(null, "", "#guide/" + st.gid);
+    else if (location.hash) history.pushState(null, "", location.pathname + location.search);
     return ui();
+  }
+  if (b.dataset.pre) {
+    st.open.has(b.dataset.pre) ? st.open.delete(b.dataset.pre) : st.open.add(b.dataset.pre);
+    return render();
   }
   if (b.dataset.t) {
     st.types.has(b.dataset.t) ? st.types.delete(b.dataset.t) : st.types.add(b.dataset.t);
@@ -464,5 +476,123 @@ document.addEventListener("keydown", (e) => {
   e.preventDefault();
   i < a.length - 1 ? a[i + 1].focus() : act("check");
 });
-// Démarrage.
-ui();
+// ================= GUIDE DE CONFIGURATION =================
+// Une grande fiche par protocole : étapes numérotées, prérequis liés, pièges courants.
+const LVL = { req: "Obligatoire", reco: "Recommandé", opt: "Optionnel" };
+const byId = (id) => D.find((t) => t.id == id);
+const guides = () => D.filter((t) => t.guide);
+// Lignes non vides d'un texte de commandes.
+const lines = (s) => (s || "").split("\n").filter(Boolean);
+// Lien vers la fiche d'un protocole (texte simple si elle n'a pas encore de guide).
+const glink = (t) =>
+  t.guide ? `<a href="#guide/${t.id}">${esc(t.name)}</a>` : `<span>${esc(t.name)}</span>`;
+// Config d'une fiche sous forme de lignes, avec le titre de chaque étape en commentaire.
+// onlyReq : uniquement les étapes obligatoires (aperçu des prérequis).
+function allCfg(t, onlyReq) {
+  return t.guide.steps
+    .filter((s) => !onlyReq || s.level == "req")
+    .flatMap((s, i) => [
+      `! ${i + 1}. ${s.title}${s.prompt && s.prompt != t.prompt ? " (" + s.prompt + ")" : ""}`,
+      ...lines(s.config),
+    ]);
+}
+// Lit l'URL : #guide/<id> ouvre cette fiche dans le Guide. Renvoie true si la page a été redessinée.
+function route() {
+  const m = location.hash.match(/^#guide\/([\w-]+)$/),
+    t = m && byId(m[1]);
+  if (!t || !t.guide) return false;
+  if (st.gid != t.id) {
+    st.open.clear();
+    window.scrollTo(0, 0);
+  }
+  st.gid = t.id;
+  st.view = "GUIDE";
+  ui();
+  return true;
+}
+addEventListener("hashchange", route);
+addEventListener("popstate", route);
+// Menu déroulant du Guide (mobile) : change de fiche.
+document.addEventListener("change", (e) => {
+  if (e.target.id == "gsel") location.hash = "#guide/" + e.target.value;
+});
+// Affiche le Guide : liste des protocoles à gauche, fiche détaillée à droite.
+function guide() {
+  const G = guides();
+  if (!byId(st.gid)?.guide) st.gid = G[0].id;
+  const t = byId(st.gid),
+    tk = tokens();
+  // Liste de gauche, filtrée par la recherche (nom, description, commandes des étapes).
+  const match = (x) => {
+    const txt = [x.name, x.description, ...(x.guide?.steps || []).map((s) => s.title + " " + s.config)]
+      .join(" ")
+      .toLowerCase();
+    return tk.every((w) => txt.includes(w));
+  };
+  const list = ["CCNA", "ENCOR"]
+    .map((lv) => {
+      const L = D.filter((x) => x.level == lv && match(x));
+      if (!L.length) return "";
+      return `<h3>${lv == "ENCOR" ? "CCNP ENCOR" : lv}</h3>${L.map((x) =>
+        x.guide
+          ? `<a href="#guide/${x.id}" class="${x.id == t.id ? "on" : ""}">${esc(x.name)}<small>${x.guide.steps.length}</small></a>`
+          : `<span class="soon" title="Guide à venir">${esc(x.name)}</span>`,
+      ).join("")}`;
+    })
+    .join("");
+  const sel = `<select id="gsel" aria-label="Choisir un protocole">${G.map(
+    (x) => `<option value="${x.id}" ${x.id == t.id ? "selected" : ""}>${esc(x.name)}</option>`,
+  ).join("")}</select>`;
+  // Prérequis : lien + bouton ▸ qui déplie les étapes obligatoires sur place.
+  const req = (t.requires || []).map(byId).filter(Boolean);
+  const reqBar = req.length
+    ? `<div class="gbar"><b>Nécessite</b>${req
+        .map(
+          (r) =>
+            `<span class="chip">${glink(r)}${r.guide ? `<button data-pre="${r.id}" aria-expanded="${st.open.has(r.id)}" title="Aperçu des étapes obligatoires">${st.open.has(r.id) ? "▾" : "▸"}</button>` : ""}</span>`,
+        )
+        .join('<i aria-hidden="true">+</i>')}</div>${req
+        .filter((r) => r.guide && st.open.has(r.id))
+        .map(
+          (r) =>
+            `<div class="pre"><div class="pre-h">Étapes obligatoires de <b>${esc(r.name)}</b> · ${glink({ ...r, name: "ouvrir la fiche complète →" })}</div>${blk("C", allCfg(r, true), r.prompt)}</div>`,
+        )
+        .join("")}`
+    : "";
+  // Étapes numérotées.
+  const steps = t.guide.steps
+    .map(
+      (s, i) => `${s.section ? `<h3 class="gsec">${esc(s.section)}</h3>` : ""}
+<div class="step">
+  <div class="sh"><span class="num">${i + 1}</span><h3>${esc(s.title)}</h3><span class="lvl ${s.level}">${LVL[s.level]}</span></div>
+  ${s.note ? `<p>${esc(s.note)}</p>` : ""}
+  ${blk("C", lines(s.config), s.prompt || t.prompt)}
+  ${s.verify ? blk("S", lines(s.verify), s.prompt || t.prompt) : ""}
+</div>`,
+    )
+    .join("");
+  const pit = t.guide.pitfalls?.length
+    ? `<div class="pit"><h3>⚠ Pièges courants</h3><ul>${t.guide.pitfalls.map((p) => `<li>${esc(p)}</li>`).join("")}</ul></div>`
+    : "";
+  // « Utilisé par » : fiches dont les requires contiennent celle-ci.
+  const used = D.filter((x) => (x.requires || []).includes(t.id));
+  const usedBar = used.length
+    ? `<div class="gbar used"><b>Utilisé par</b>${used.map((x) => `<span class="chip">${glink(x)}</span>`).join("")}</div>`
+    : "";
+  $("#out").innerHTML = `
+<div class="guide">
+  <div class="glist" role="navigation" aria-label="Protocoles">${list || `<p class="soon">Aucun protocole ne correspond.</p>`}</div>
+  ${sel}
+  <article class="card gcard">
+    <h2>${esc(t.name)} <span class="tag ${t.level}">${t.level}</span>${t.category ? `<span class="tag">${t.category == "sec" ? "SECURITY" : "SERVICES"}</span>` : ""}</h2>
+    <p>${t.description}</p>
+    ${reqBar}
+    <div class="acts"><button class="pri" data-copy="${encodeURIComponent(allCfg(t).join("\n"))}">Copier toute la config</button></div>
+    ${steps}
+    ${pit}
+    ${usedBar}
+  </article>
+</div>`;
+}
+// Démarrage : ouvre la fiche indiquée dans l'URL (#guide/<id>), sinon le Guide sur sa première fiche.
+route() || ui();

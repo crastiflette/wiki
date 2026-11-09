@@ -631,3 +631,293 @@ pre {
   padding: 2px 10px;
   border-radius: 99px;
 }
+/* ===== Onglet Guide : liste des protocoles + fiche détaillée ===== */
+.guide {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+/* Liste de gauche : reste visible sous la recherche pendant le défilement */
+.glist {
+  position: sticky;
+  top: var(--hh, 130px);
+  max-height: calc(100vh - var(--hh, 130px) - 16px);
+  overflow: auto;
+  background: var(--pn);
+  border: 1px solid var(--bd);
+  border-radius: 14px;
+  padding: 6px 8px 10px;
+}
+.glist h3 {
+  margin: 12px 8px 4px;
+  font: 700 11px var(--f1);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mu);
+}
+.glist a,
+.glist .soon {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 14px;
+}
+.glist a {
+  color: var(--tx);
+  text-decoration: none;
+  font-weight: 500;
+}
+.glist a:hover {
+  background: var(--bg);
+  color: var(--ac);
+}
+.glist a.on {
+  background: var(--bg);
+  color: var(--ac);
+  font-weight: 700;
+  box-shadow: inset 3px 0 0 #049fd9;
+}
+.glist small {
+  font: 500 11px var(--f2);
+  color: var(--mu);
+}
+.soon {
+  color: var(--mu);
+  opacity: 0.55;
+}
+#gsel {
+  display: none;
+}
+/* Fiche détaillée */
+.gcard {
+  padding: 24px 26px 22px;
+  max-width: 900px;
+}
+.gcard h2 {
+  font-size: 30px;
+}
+.gcard > p {
+  max-width: 70ch;
+  font-size: 15px;
+}
+/* Bandeaux « Nécessite » et « Utilisé par » */
+.gbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 4px;
+  font-size: 14px;
+}
+.gbar b {
+  font: 700 11px var(--f1);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mu);
+  margin-right: 2px;
+}
+.gbar i {
+  font-style: normal;
+  color: var(--mu);
+}
+.gbar.used {
+  margin-top: 22px;
+  padding-top: 16px;
+  border-top: 1px solid var(--bd);
+}
+.chip {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--bd);
+  border-radius: 99px;
+  overflow: hidden;
+  background: var(--bg);
+}
+.chip a,
+.chip span {
+  padding: 3px 12px;
+  font-weight: 600;
+}
+.chip a {
+  color: var(--ac);
+  text-decoration: none;
+}
+.chip a:hover {
+  text-decoration: underline;
+}
+.chip button {
+  border-left: 1px solid var(--bd);
+  padding: 0 10px;
+  color: var(--mu);
+  transition: transform 0.15s;
+}
+.chip button:hover {
+  color: var(--ac);
+}
+.chip button[aria-expanded="true"] {
+  color: var(--ac);
+}
+/* Aperçu déplié d'un prérequis */
+.pre {
+  margin: 10px 0 6px;
+  padding-left: 14px;
+  border-left: 3px solid var(--ac);
+}
+.pre-h {
+  font-size: 13px;
+  color: var(--mu);
+}
+.pre-h a {
+  color: var(--ac);
+}
+.gcard .acts {
+  margin: 16px 0 4px;
+}
+/* Titre de groupe d'étapes (ex. « Méthode 1 ») */
+.gsec {
+  margin: 30px 0 0;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--bd);
+  font: 700 13px var(--f1);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--pu);
+}
+/* Étape numérotée, reliée à la suivante par un trait vertical */
+.step {
+  position: relative;
+  padding-left: 46px;
+  margin-top: 22px;
+}
+.step::before {
+  content: "";
+  position: absolute;
+  left: 15px;
+  top: 36px;
+  bottom: -18px;
+  width: 2px;
+  background: var(--bd);
+}
+.step:not(:has(+ .step))::before {
+  display: none;
+}
+.num {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--tx);
+  color: var(--bg);
+  font: 700 14px var(--f2);
+}
+.sh {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  min-height: 32px;
+}
+.sh h3 {
+  margin: 0;
+  font: 700 18px/1.25 var(--f1);
+  letter-spacing: -0.01em;
+}
+.lvl {
+  font: 600 11px var(--f1);
+  padding: 2px 9px;
+  border-radius: 99px;
+}
+.lvl.req {
+  background: #ff5d6c1f;
+  color: var(--r);
+}
+.lvl.reco {
+  background: #0a7fd120;
+  color: var(--ac);
+}
+.lvl.opt {
+  background: var(--bg);
+  color: var(--mu);
+}
+.step p {
+  margin: 4px 0 0;
+  color: var(--mu);
+  font-size: 14px;
+  max-width: 70ch;
+}
+/* Encadré des pièges courants */
+.pit {
+  margin-top: 28px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  background: #ffb02016;
+  border: 1px solid #ffb02055;
+}
+.pit h3 {
+  margin: 0 0 6px;
+  font: 700 16px var(--f1);
+}
+.pit ul {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 14px;
+}
+.pit li + li {
+  margin-top: 4px;
+}
+/* Tablette / mobile : une seule colonne, la liste devient un menu déroulant */
+@media (max-width: 820px) {
+  .guide {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .glist {
+    display: none;
+  }
+  #gsel {
+    display: block;
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid var(--bd);
+    background: var(--pn);
+    color: var(--tx);
+    font: 600 16px var(--f1);
+  }
+}
+@media (max-width: 480px) {
+  .gcard {
+    padding: 16px 13px 14px;
+  }
+  .gcard h2 {
+    font-size: 24px;
+  }
+  .step {
+    padding-left: 0;
+  }
+  .step::before {
+    display: none;
+  }
+  .num {
+    position: static;
+    width: 26px;
+    height: 26px;
+    font-size: 13px;
+    flex: none;
+  }
+  .sh {
+    min-height: 0;
+  }
+  /* Le titre reste sur la ligne du numéro ; le badge passe dessous */
+  .sh h3 {
+    flex: 1 1 calc(100% - 40px);
+    font-size: 17px;
+  }
+}

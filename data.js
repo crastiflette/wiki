@@ -6,6 +6,20 @@
  *   prompt   : équipement affiché dans le prompt : "R1" (routeur) ou "SW1" (switch)
  *   config, show, troubleshoot, debug : une commande par ligne.
  *   Les <VARIABLES> en majuscules sont surlignées et acceptent n'importe quelle valeur à l'entraînement.
+ *
+ * ONGLET GUIDE (facultatif) : une fiche n'apparaît dans le Guide que si elle a un champ guide.
+ *   id       : identifiant court, utilisé dans l'URL (#guide/vlan) et dans les requires
+ *   requires : ids des protocoles à configurer avant, dans l'ordre (ex. ["vlan", "trunk"])
+ *              « Utilisé par » est calculé automatiquement à partir des requires des autres fiches.
+ *   guide.steps : liste d'étapes, chacune avec :
+ *     title   : titre de l'étape
+ *     level   : "req" (obligatoire), "reco" (recommandé) ou "opt" (optionnel)
+ *     note    : explication (facultatif)
+ *     config  : commandes, une par ligne (mode configuration)
+ *     verify  : commandes de vérification (facultatif)
+ *     prompt  : équipement, si différent de celui de la fiche (facultatif)
+ *     section : titre de groupe affiché avant l'étape, ex. "Méthode 1" (facultatif)
+ *   guide.pitfalls : liste des pièges courants
  */
 const D = [
   {
@@ -40,6 +54,83 @@ show history`,
 show running-config | section <KEYWORD>`,
     debug: `terminal monitor
 undebug all`,
+    id: "basic",
+    requires: [],
+    guide: {
+      steps: [
+        {
+          title: "Nommer l'équipement",
+          level: "req",
+          note: "Le nom apparaît dans le prompt, dans les logs et chez les voisins CDP : il évite de se tromper d'équipement.",
+          config: `hostname <HOSTNAME>`,
+          verify: `show running-config | include hostname`,
+        },
+        {
+          title: "Protéger le mode privilégié",
+          level: "req",
+          note: "enable secret stocke un hash. N'utilise jamais enable password, stocké en clair.",
+          config: `enable secret <PASSWORD>
+! Masque les mots de passe restés en clair (chiffrement faible, type 7)
+service password-encryption`,
+          verify: `show running-config | include secret|password`,
+        },
+        {
+          title: "Créer un compte administrateur local",
+          level: "reco",
+          note: "Indispensable pour login local (console, SSH) : chaque accès se fait avec un nom d'utilisateur.",
+          config: `username <USERNAME> privilege 15 secret <PASSWORD>
+! Refuse les mots de passe trop courts
+security passwords min-length 10`,
+          verify: `show running-config | include username`,
+        },
+        {
+          title: "Sécuriser la console",
+          level: "req",
+          note: "Demande un identifiant sur le port console et ferme la session après 10 minutes d'inactivité. En lab, exec-timeout 0 0 évite les déconnexions, mais pas en production.",
+          config: `line console 0
+ login local
+ exec-timeout 10 0
+ logging synchronous`,
+          verify: `show running-config | section line con`,
+        },
+        {
+          title: "Restreindre les lignes VTY à SSH",
+          level: "reco",
+          note: "Telnet circule en clair : on n'autorise que SSH. Les clés SSH et le nom de domaine sont à configurer en plus (fiche SSH).",
+          config: `line vty 0 15
+ login local
+ transport input ssh
+ exec-timeout 10 0`,
+          verify: `show running-config | section line vty`,
+        },
+        {
+          title: "Afficher une bannière légale",
+          level: "reco",
+          note: "Prévient que l'accès est réservé : utile juridiquement en cas d'intrusion.",
+          config: `banner motd #Acces reserve au personnel autorise#`,
+        },
+        {
+          title: "Confort de la CLI",
+          level: "opt",
+          note: "Sans cette ligne, une faute de frappe est prise pour un nom d'hôte et IOS bloque plusieurs secondes à essayer de le résoudre.",
+          config: `no ip domain-lookup`,
+        },
+        {
+          title: "Sauvegarder la configuration",
+          level: "req",
+          note: "La running-config est en RAM : sans sauvegarde, tout est perdu au redémarrage. do permet de lancer une commande du mode privilégié depuis le mode configuration.",
+          config: `do copy running-config startup-config`,
+          verify: `show startup-config`,
+        },
+      ],
+      pitfalls: [
+        "Oublier de sauvegarder : un redémarrage ou une coupure de courant efface toute la configuration.",
+        "Utiliser enable password au lieu de enable secret : le mot de passe est stocké en clair.",
+        "Compter sur service password-encryption : le type 7 se déchiffre en quelques secondes, il ne protège que des regards par-dessus l'épaule.",
+        "Mettre login local sans avoir créé de username : plus personne ne peut s'authentifier sur les lignes VTY.",
+        "Laisser exec-timeout 0 0 en production : une session oubliée reste ouverte indéfiniment.",
+      ],
+    },
   },
   {
     name: "Interfaces",
@@ -67,6 +158,69 @@ show interfaces description`,
 show interfaces counters errors
 show controllers <INTERFACE>`,
     debug: ``,
+    id: "interfaces",
+    requires: ["basic"],
+    guide: {
+      steps: [
+        {
+          title: "Sélectionner et documenter le port",
+          level: "req",
+          note: "La description dit à quoi sert le port (équipement en face, lien) : elle s'affiche dans show interfaces description.",
+          config: `interface <INTERFACE>
+ description <TEXT>`,
+          verify: `show interfaces description`,
+        },
+        {
+          title: "Configurer l'adresse IP",
+          level: "req",
+          note: "Sur un routeur. Sur un switch de niveau 2, l'adresse se met sur une SVI (interface vlan), pas sur un port physique.",
+          config: `interface <INTERFACE>
+ ip address <IP_ADDRESS> <SUBNET_MASK>`,
+          verify: `show ip interface brief`,
+        },
+        {
+          title: "Activer l'interface",
+          level: "req",
+          note: "Les interfaces d'un routeur sont éteintes par défaut. Attendu : Status up et Protocol up.",
+          config: `interface <INTERFACE>
+ no shutdown`,
+          verify: `show ip interface brief`,
+        },
+        {
+          title: "Vitesse et duplex",
+          level: "opt",
+          note: "auto par défaut. Si tu les fixes à la main, fais-le des deux côtés du lien avec les mêmes valeurs.",
+          config: `interface <INTERFACE>
+ speed auto
+ duplex auto`,
+          verify: `show interfaces <INTERFACE> | include duplex`,
+        },
+        {
+          title: "Créer une loopback",
+          level: "opt",
+          note: "Interface virtuelle toujours up : idéale comme adresse de management et comme router-id (OSPF, BGP).",
+          config: `interface loopback 0
+ ip address <IP_ADDRESS> 255.255.255.255`,
+          verify: `show ip interface brief | include Loopback`,
+        },
+        {
+          title: "Éteindre les ports inutilisés",
+          level: "reco",
+          prompt: "SW1",
+          note: "Sur un switch, tous les ports sont actifs par défaut : n'importe qui peut brancher un équipement. interface range configure plusieurs ports d'un coup.",
+          config: `interface range <INTERFACE_RANGE>
+ description UNUSED
+ shutdown`,
+          verify: `show interfaces status`,
+        },
+      ],
+      pitfalls: [
+        "Oublier no shutdown sur un routeur : l'interface reste administratively down.",
+        "Duplex différent des deux côtés : le lien monte mais il est lent, avec des erreurs (late collisions, CRC).",
+        "Deux interfaces d'un même routeur dans le même sous-réseau : IOS refuse la seconde (% ... overlaps with ...).",
+        "Status up mais Protocol down : souvent un problème de couche 2 (encapsulation, keepalive, câble ou équipement en face).",
+      ],
+    },
   },
   {
     name: "VLAN",
@@ -91,6 +245,77 @@ show mac address-table`,
 show interfaces switchport
 show mac address-table vlan <VLAN_ID>`,
     debug: ``,
+    id: "vlan",
+    requires: ["basic"],
+    guide: {
+      steps: [
+        {
+          title: "Créer les VLAN",
+          level: "req",
+          note: "Un nom clair (USERS, VOIX, SERVEURS) facilite le dépannage. Les VLAN sont enregistrés dans vlan.dat, en flash.",
+          config: `vlan <VLAN_ID>
+ name <VLAN_NAME>`,
+          verify: `show vlan brief`,
+        },
+        {
+          title: "Affecter les ports d'accès",
+          level: "req",
+          note: "Un port d'accès appartient à un seul VLAN : c'est le cas des PC, imprimantes et téléphones sans voice VLAN.",
+          config: `interface <INTERFACE>
+ switchport mode access
+ switchport access vlan <VLAN_ID>`,
+          verify: `show vlan brief
+show interfaces <INTERFACE> switchport`,
+        },
+        {
+          title: "Désactiver la négociation DTP",
+          level: "reco",
+          note: "Empêche un équipement branché sur le port de négocier un trunk (attaque switch spoofing).",
+          config: `interface <INTERFACE>
+ switchport nonegotiate`,
+          verify: `show interfaces <INTERFACE> switchport | include Negotiation`,
+        },
+        {
+          title: "PortFast et BPDU Guard sur les ports utilisateurs",
+          level: "reco",
+          note: "PortFast fait passer le port en forwarding immédiatement (pas d'attente STP au branchement d'un PC). BPDU Guard coupe le port si un switch y est branché. Détails dans la fiche STP.",
+          config: `interface <INTERFACE>
+ spanning-tree portfast
+ spanning-tree bpduguard enable`,
+          verify: `show spanning-tree interface <INTERFACE> detail`,
+        },
+        {
+          title: "Isoler les ports inutilisés dans un VLAN « parking »",
+          level: "reco",
+          note: "Un port oublié ne doit donner accès à aucun réseau : on le met dans un VLAN qui ne sert à rien, et on l'éteint.",
+          config: `vlan <PARKING_VLAN>
+ name PARKING
+interface range <INTERFACE_RANGE>
+ switchport mode access
+ switchport access vlan <PARKING_VLAN>
+ shutdown`,
+          verify: `show vlan brief`,
+        },
+        {
+          title: "VLAN et adresse de management",
+          level: "reco",
+          note: "Pour administrer le switch à distance : une SVI dans un VLAN dédié (pas le VLAN 1) et une passerelle par défaut.",
+          config: `vlan <MGMT_VLAN>
+ name MGMT
+interface vlan <MGMT_VLAN>
+ ip address <IP_ADDRESS> <SUBNET_MASK>
+ no shutdown
+ip default-gateway <GATEWAY_IP>`,
+          verify: `show ip interface brief | include Vlan`,
+        },
+      ],
+      pitfalls: [
+        "Laisser les utilisateurs ou le management dans le VLAN 1 : c'est le VLAN par défaut de tous les ports, la première cible d'une attaque.",
+        "switchport access vlan sur un VLAN qui n'existe pas : le switch le crée automatiquement, sans nom (% Access VLAN does not exist. Creating vlan ...).",
+        "Les VLAN sont dans vlan.dat et pas dans la startup-config : un write erase ne les supprime pas, il faut aussi delete flash:vlan.dat.",
+        "Une SVI reste down tant qu'aucun port actif n'appartient à son VLAN (ou qu'aucun trunk ne le transporte).",
+      ],
+    },
   },
   {
     name: "Trunk / 802.1Q",
@@ -115,6 +340,63 @@ show interfaces <INTERFACE> switchport`,
 show interfaces switchport
 show spanning-tree vlan <VLAN_ID>`,
     debug: `debug dtp packets`,
+    id: "trunk",
+    requires: ["vlan"],
+    guide: {
+      steps: [
+        {
+          title: "Passer le port en trunk",
+          level: "req",
+          note: "La ligne encapsulation n'existe que sur les switchs qui gèrent aussi ISL (ex. 3560) : sur un 2960 elle est refusée, c'est normal.",
+          config: `interface <INTERFACE>
+ description TRUNK vers <TEXT>
+ switchport trunk encapsulation dot1q
+ switchport mode trunk`,
+          verify: `show interfaces trunk`,
+        },
+        {
+          title: "Désactiver la négociation DTP",
+          level: "reco",
+          note: "Le trunk est forcé des deux côtés : la négociation ne sert plus à rien et ouvre la porte au switch spoofing.",
+          config: `interface <INTERFACE>
+ switchport nonegotiate`,
+          verify: `show interfaces <INTERFACE> switchport | include Negotiation`,
+        },
+        {
+          title: "Limiter les VLAN autorisés",
+          level: "reco",
+          note: "Par défaut, tous les VLAN passent. Pour en ajouter un plus tard, utilise add, sinon la liste est remplacée.",
+          config: `interface <INTERFACE>
+ switchport trunk allowed vlan <VLAN_LIST>
+! Plus tard, pour ajouter un VLAN sans effacer les autres :
+ switchport trunk allowed vlan add <VLAN_ID>`,
+          verify: `show interfaces trunk`,
+        },
+        {
+          title: "Utiliser un VLAN natif dédié et inutilisé",
+          level: "reco",
+          note: "Les trames du VLAN natif passent sans étiquette. Un VLAN natif qui ne sert à rien protège du VLAN hopping par double tag. Il doit être identique aux deux extrémités.",
+          config: `vlan <NATIVE_VLAN>
+ name NATIVE
+interface <INTERFACE>
+ switchport trunk native vlan <NATIVE_VLAN>`,
+          verify: `show interfaces trunk`,
+        },
+        {
+          title: "Étiqueter aussi le VLAN natif",
+          level: "opt",
+          note: "Commande globale : même les trames du VLAN natif reçoivent un tag 802.1Q. Elle n'existe pas sur tous les modèles.",
+          config: `vlan dot1q tag native`,
+          verify: `show vlan dot1q tag native`,
+        },
+      ],
+      pitfalls: [
+        "VLAN natif différent des deux côtés : les trafics se mélangent entre VLAN et CDP affiche %CDP-4-NATIVE_VLAN_MISMATCH.",
+        "switchport trunk allowed vlan sans add : la nouvelle liste remplace l'ancienne et coupe les autres VLAN.",
+        "Un VLAN autorisé sur le trunk mais pas créé sur le switch n'est pas transmis (absent de la ligne active de show interfaces trunk).",
+        "Deux ports en dynamic auto : aucun ne prend l'initiative, le trunk ne monte jamais.",
+      ],
+    },
   },
   {
     name: "Inter-VLAN Routing",
@@ -143,6 +425,81 @@ show interfaces trunk`,
     troubleshoot: `show vlan brief
 show ip route connected`,
     debug: ``,
+    id: "intervlan",
+    requires: ["vlan", "trunk"],
+    guide: {
+      steps: [
+        {
+          section: "Méthode 1 : router-on-a-stick (un routeur, un lien trunk)",
+          title: "Activer l'interface physique du routeur",
+          level: "req",
+          prompt: "R1",
+          note: "Pas d'adresse IP sur l'interface physique : elles vont sur les sous-interfaces. Côté switch, le port vers le routeur doit être un trunk (voir le prérequis Trunk).",
+          config: `interface GigabitEthernet0/0
+ no shutdown`,
+          verify: `show ip interface brief`,
+        },
+        {
+          title: "Créer une sous-interface par VLAN",
+          level: "req",
+          prompt: "R1",
+          note: "Seul le numéro de encapsulation dot1Q compte. Garde le même numéro de sous-interface que le VLAN pour s'y retrouver. L'adresse IP est la passerelle des machines du VLAN.",
+          config: `interface GigabitEthernet0/0.<VLAN_ID>
+ description Passerelle VLAN <VLAN_ID>
+ encapsulation dot1Q <VLAN_ID>
+ ip address <IP_ADDRESS> <SUBNET_MASK>`,
+          verify: `show ip interface brief
+show ip route connected`,
+        },
+        {
+          title: "Déclarer le VLAN natif",
+          level: "opt",
+          prompt: "R1",
+          note: "Seulement si le VLAN natif du trunk doit être routé. Le mot-clé native doit correspondre au VLAN natif configuré sur le switch.",
+          config: `interface GigabitEthernet0/0.<NATIVE_VLAN>
+ encapsulation dot1Q <NATIVE_VLAN> native`,
+        },
+        {
+          section: "Méthode 2 : switch de niveau 3 (SVI)",
+          title: "Activer le routage IP",
+          level: "req",
+          prompt: "SW1",
+          note: "Sans cette commande, un switch L3 ne route pas : les SVI ne servent qu'au management.",
+          config: `ip routing`,
+          verify: `show ip route`,
+        },
+        {
+          title: "Créer une SVI par VLAN",
+          level: "req",
+          prompt: "SW1",
+          note: "L'adresse IP de la SVI est la passerelle des machines du VLAN. La SVI ne monte que si le VLAN existe et a au moins un port actif.",
+          config: `interface vlan <VLAN_ID>
+ description Passerelle VLAN <VLAN_ID>
+ ip address <IP_ADDRESS> <SUBNET_MASK>
+ no shutdown`,
+          verify: `show ip interface brief | include Vlan
+show ip route connected`,
+        },
+        {
+          title: "Lien routé vers le routeur ou l'extérieur",
+          level: "opt",
+          prompt: "SW1",
+          note: "no switchport transforme le port en port routé, comme une interface de routeur. Ajoute ensuite une route par défaut ou un protocole de routage.",
+          config: `interface <INTERFACE>
+ no switchport
+ ip address <IP_ADDRESS> <SUBNET_MASK>
+ no shutdown`,
+          verify: `show ip interface brief`,
+        },
+      ],
+      pitfalls: [
+        "Oublier ip routing sur le switch L3 : les SVI sont up, mais rien n'est routé entre les VLAN.",
+        "Les machines n'ont pas la bonne passerelle : elle doit être l'IP de la sous-interface ou de la SVI de leur VLAN.",
+        "VLAN non autorisé sur le trunk vers le routeur : la sous-interface est up mais ne reçoit rien.",
+        "SVI down : le VLAN n'existe pas sur le switch, ou aucun port actif n'y est affecté.",
+        "Erreur de numéro dans encapsulation dot1Q : le trafic du VLAN arrive sur la mauvaise sous-interface.",
+      ],
+    },
   },
   {
     name: "STP / RSTP",
