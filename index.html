@@ -16,7 +16,9 @@
       href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=JetBrains+Mono:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css" />
+    <!-- ?v=N : augmenter N à chaque modification de styles.css, data.js ou app.js
+         pour que Cloudflare serve la nouvelle version au lieu de sa copie en cache -->
+    <link rel="stylesheet" href="styles.css?v=2" />
   </head>
   <body>
     <div class="app">
@@ -54,7 +56,7 @@
       </main>
     </div>
     <!-- data.js doit être chargé avant app.js (app.js utilise le tableau D) -->
-    <script src="data.js"></script>
-    <script src="app.js"></script>
+    <script src="data.js?v=2"></script>
+    <script src="app.js?v=2"></script>
   </body>
 </html>
