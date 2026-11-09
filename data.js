@@ -528,6 +528,73 @@ show spanning-tree interface <INTERFACE> detail`,
 show spanning-tree inconsistentports`,
     debug: `debug spanning-tree events
 undebug all`,
+    id: "stp",
+    requires: ["vlan"],
+    guide: {
+      steps: [
+        {
+          title: "Passer en Rapid PVST+",
+          level: "req",
+          note: "Convergence en quelques secondes au lieu de 30 à 50 s. À configurer sur tous les switchs du réseau.",
+          config: `spanning-tree mode rapid-pvst`,
+          verify: `show spanning-tree summary`,
+        },
+        {
+          title: "Choisir le switch racine",
+          level: "req",
+          note: "Sans réglage, la racine est le switch à la plus petite adresse MAC, souvent le plus ancien. Place-la sur le switch central (cœur ou distribution).",
+          config: `spanning-tree vlan <VLAN_LIST> root primary`,
+          verify: `show spanning-tree root`,
+        },
+        {
+          title: "Désigner une racine de secours",
+          level: "reco",
+          prompt: "SW2",
+          note: "Si la racine tombe, c'est ce switch qui prend le relais, et pas un switch d'accès au hasard.",
+          config: `spanning-tree vlan <VLAN_LIST> root secondary`,
+          verify: `show spanning-tree root`,
+        },
+        {
+          title: "PortFast et BPDU Guard sur les ports d'accès",
+          level: "reco",
+          note: "PortFast : le port passe tout de suite en forwarding. BPDU Guard : le port est coupé (err-disabled) si un switch y est branché.",
+          config: `interface range <INTERFACE_RANGE>
+ spanning-tree portfast
+ spanning-tree bpduguard enable`,
+          verify: `show spanning-tree interface <INTERFACE> detail`,
+        },
+        {
+          title: "Ou bien : PortFast et BPDU Guard par défaut",
+          level: "opt",
+          note: "Même effet, appliqué automatiquement à tous les ports en mode access.",
+          config: `spanning-tree portfast default
+spanning-tree portfast bpduguard default`,
+          verify: `show spanning-tree summary`,
+        },
+        {
+          title: "Root Guard vers les switchs d'accès",
+          level: "opt",
+          note: "Sur les ports de la racine qui descendent vers l'accès : un switch d'accès ne pourra jamais devenir racine.",
+          config: `interface <INTERFACE>
+ spanning-tree guard root`,
+          verify: `show spanning-tree inconsistentports`,
+        },
+        {
+          title: "Réactivation automatique des ports coupés",
+          level: "opt",
+          note: "Un port mis en err-disabled par BPDU Guard se réactive seul après 300 secondes.",
+          config: `errdisable recovery cause bpduguard
+errdisable recovery interval 300`,
+          verify: `show errdisable recovery`,
+        },
+      ],
+      pitfalls: [
+        "Ne pas choisir la racine : le trafic passe par un vieux switch d'accès, avec des chemins sous-optimaux.",
+        "Activer PortFast sur un port relié à un autre switch : risque de boucle le temps que STP réagisse.",
+        "La priorité doit être un multiple de 4096 (0, 4096, 8192...) : les autres valeurs sont refusées.",
+        "Un port coupé par BPDU Guard ne revient pas tout seul : shutdown puis no shutdown, ou errdisable recovery.",
+      ],
+    },
   },
   {
     name: "EtherChannel / LACP",
@@ -551,6 +618,61 @@ show lacp neighbor
 show running-config interface <INTERFACE>`,
     debug: `debug lacp packet
 debug etherchannel`,
+    id: "etherchannel",
+    requires: ["trunk"],
+    guide: {
+      steps: [
+        {
+          title: "Éteindre les ports membres pendant la configuration",
+          level: "reco",
+          note: "Évite qu'un port monte avant que les deux côtés soient prêts, ce qui peut le mettre en err-disabled. Les ports doivent avoir la même vitesse et le même duplex.",
+          config: `interface range <INTERFACE_RANGE>
+ shutdown`,
+        },
+        {
+          title: "Regrouper les ports avec LACP",
+          level: "req",
+          note: "active : ce switch propose LACP. Au moins un des deux côtés doit être en active.",
+          config: `interface range <INTERFACE_RANGE>
+ channel-group <ID> mode active`,
+          verify: `show etherchannel summary`,
+        },
+        {
+          title: "Configurer l'interface port-channel",
+          level: "req",
+          note: "Les réglages se font sur le port-channel : ils sont recopiés sur les ports membres.",
+          config: `interface port-channel <ID>
+ description <TEXT>
+ switchport trunk encapsulation dot1q
+ switchport mode trunk
+ switchport nonegotiate
+ switchport trunk allowed vlan <VLAN_LIST>`,
+          verify: `show interfaces trunk`,
+        },
+        {
+          title: "Rallumer les ports membres",
+          level: "req",
+          note: "Attendu dans show etherchannel summary : le port-channel en (SU) et chaque port en (P).",
+          config: `interface range <INTERFACE_RANGE>
+ no shutdown`,
+          verify: `show etherchannel summary
+show lacp neighbor`,
+        },
+        {
+          title: "Choisir la répartition de charge",
+          level: "opt",
+          note: "Le trafic est réparti par flux, pas par paquet. src-dst-ip répartit mieux que la valeur par défaut (souvent src-mac).",
+          config: `port-channel load-balance src-dst-ip`,
+          verify: `show etherchannel load-balance`,
+        },
+      ],
+      pitfalls: [
+        "Modes incompatibles : passive des deux côtés, ou on face à active, et le groupe ne se forme pas.",
+        "Ports membres configurés différemment (VLAN, mode, vitesse) : ils sont suspendus, (s) dans show etherchannel summary.",
+        "Modifier un port membre au lieu du port-channel : la configuration n'est plus cohérente et le port sort du groupe.",
+        "Mélanger LACP (active/passive) et PAgP (desirable/auto) : ce sont deux protocoles différents.",
+      ],
+    },
   },
   {
     name: "DHCP",
@@ -580,6 +702,60 @@ show ip dhcp server statistics
 show ip interface <INTERFACE>`,
     debug: `debug ip dhcp server events
 debug ip dhcp server packet`,
+    id: "dhcp",
+    requires: ["interfaces"],
+    guide: {
+      steps: [
+        {
+          title: "Exclure les adresses fixes",
+          level: "req",
+          note: "À faire avant le pool : la passerelle, les serveurs et les imprimantes ne doivent jamais être distribués.",
+          config: `ip dhcp excluded-address <START_IP> <END_IP>`,
+        },
+        {
+          title: "Créer le pool",
+          level: "req",
+          note: "network doit correspondre au réseau de l'interface côté clients. default-router est la passerelle des clients.",
+          config: `ip dhcp pool <POOL_NAME>
+ network <NETWORK> <SUBNET_MASK>
+ default-router <GATEWAY_IP>
+ dns-server <DNS_IP>`,
+          verify: `show ip dhcp pool
+show ip dhcp binding`,
+        },
+        {
+          title: "Options supplémentaires",
+          level: "opt",
+          note: "Nom de domaine donné aux clients et durée du bail (en jours).",
+          config: `ip dhcp pool <POOL_NAME>
+ domain-name <DOMAIN>
+ lease 7`,
+        },
+        {
+          title: "Relais DHCP vers un serveur distant",
+          level: "reco",
+          note: "Quand le serveur DHCP est sur un autre réseau : sur l'interface passerelle des clients (interface, sous-interface ou SVI).",
+          config: `interface <INTERFACE>
+ ip helper-address <DHCP_SERVER_IP>`,
+          verify: `show ip interface <INTERFACE> | include Helper`,
+        },
+        {
+          title: "Routeur client DHCP",
+          level: "opt",
+          note: "Pour une interface côté fournisseur d'accès qui reçoit son adresse par DHCP.",
+          config: `interface <INTERFACE>
+ ip address dhcp
+ no shutdown`,
+          verify: `show ip interface brief`,
+        },
+      ],
+      pitfalls: [
+        "Oublier excluded-address : la passerelle est distribuée à un client, conflit d'adresses.",
+        "Pas de default-router : les clients ont une IP mais ne sortent pas de leur réseau.",
+        "ip helper-address sur la mauvaise interface : il doit être côté clients, pas côté serveur.",
+        "Adresses en conflit : elles sont retirées du pool. show ip dhcp conflict, puis clear ip dhcp conflict *.",
+      ],
+    },
   },
   {
     name: "NAT / PAT",
@@ -605,6 +781,61 @@ show access-lists
 show ip route`,
     debug: `debug ip nat
 undebug all`,
+    id: "nat",
+    requires: ["interfaces", "static"],
+    guide: {
+      steps: [
+        {
+          title: "Désigner les interfaces inside et outside",
+          level: "req",
+          note: "inside : côté LAN (adresses privées). outside : côté Internet.",
+          config: `interface <INSIDE_INTERFACE>
+ ip nat inside
+interface <OUTSIDE_INTERFACE>
+ ip nat outside`,
+          verify: `show ip nat statistics`,
+        },
+        {
+          title: "Lister les adresses à traduire",
+          level: "req",
+          note: "Une ACL standard qui désigne les réseaux internes. Évite permit any.",
+          config: `ip access-list standard NAT_LAN
+ permit <NETWORK> <WILDCARD>`,
+          verify: `show access-lists NAT_LAN`,
+        },
+        {
+          title: "Activer le PAT sur l'interface externe",
+          level: "req",
+          note: "overload : tous les clients partagent l'adresse de l'interface externe, distingués par le numéro de port.",
+          config: `ip nat inside source list NAT_LAN interface <OUTSIDE_INTERFACE> overload`,
+          verify: `show ip nat translations
+show ip nat statistics`,
+        },
+        {
+          title: "Publier un serveur interne (NAT statique)",
+          level: "opt",
+          note: "Rend un serveur interne joignable depuis Internet. La 2e forme ne redirige qu'un port (ici le web).",
+          config: `ip nat inside source static <INSIDE_IP> <PUBLIC_IP>
+! Ou seulement un port :
+ip nat inside source static tcp <INSIDE_IP> 80 <PUBLIC_IP> 80`,
+          verify: `show ip nat translations`,
+        },
+        {
+          title: "Ou bien : pool d'adresses publiques",
+          level: "opt",
+          note: "Quand le fournisseur d'accès donne une plage d'adresses publiques au lieu d'une seule.",
+          config: `ip nat pool <POOL_NAME> <START_IP> <END_IP> netmask <SUBNET_MASK>
+ip nat inside source list NAT_LAN pool <POOL_NAME> overload`,
+          verify: `show ip nat statistics`,
+        },
+      ],
+      pitfalls: [
+        "inside et outside inversés : aucune traduction n'apparaît.",
+        "Pas de route par défaut vers Internet : la traduction se fait, mais les paquets ne partent nulle part.",
+        "ACL avec permit any : le trafic venant d'Internet peut aussi être traduit, comportement imprévisible.",
+        "Après une modification, les anciennes traductions restent : clear ip nat translation *.",
+      ],
+    },
   },
   {
     name: "ACL",
@@ -629,6 +860,64 @@ show ip interface <INTERFACE> | include access list`,
     troubleshoot: `show access-lists
 clear ip access-list counters`,
     debug: `debug ip packet <ACL_NUMBER>`,
+    id: "acl",
+    requires: ["interfaces"],
+    guide: {
+      steps: [
+        {
+          title: "Écrire une ACL étendue nommée",
+          level: "req",
+          note: "Les règles sont lues de haut en bas, la première qui correspond s'applique. Mets les plus précises en premier. remark documente l'ACL.",
+          config: `ip access-list extended <ACL_NAME>
+ remark <TEXT>
+ permit tcp <SOURCE> <WILDCARD> host <DEST_IP> eq 22
+ deny ip any any log`,
+          verify: `show ip access-lists <ACL_NAME>`,
+        },
+        {
+          title: "Appliquer l'ACL sur une interface",
+          level: "req",
+          note: "Une ACL étendue se place au plus près de la source, une ACL standard au plus près de la destination.",
+          config: `interface <INTERFACE>
+ ip access-group <ACL_NAME> in`,
+          verify: `show ip interface <INTERFACE> | include access list`,
+        },
+        {
+          title: "ACL standard (filtre sur la source seulement)",
+          level: "opt",
+          note: "Plus simple, mais ne regarde que l'adresse source. Sert aussi à désigner des adresses (NAT, SNMP, VTY).",
+          config: `ip access-list standard <ACL_NAME>
+ permit <NETWORK> <WILDCARD>`,
+          verify: `show ip access-lists <ACL_NAME>`,
+        },
+        {
+          title: "Restreindre l'accès SSH aux admins",
+          level: "reco",
+          note: "access-class filtre les connexions aux lignes VTY, pas le trafic qui traverse le routeur.",
+          config: `ip access-list standard MGMT_ACCESS
+ permit <ADMIN_NETWORK> <WILDCARD>
+line vty 0 15
+ access-class MGMT_ACCESS in`,
+          verify: `show line vty 0`,
+        },
+        {
+          title: "Modifier une ACL existante",
+          level: "opt",
+          note: "Dans une ACL nommée, chaque ligne a un numéro de séquence : on peut insérer ou supprimer une ligne sans tout réécrire.",
+          config: `ip access-list extended <ACL_NAME>
+ 15 permit icmp any any echo-reply
+ no 20`,
+          verify: `show ip access-lists <ACL_NAME>`,
+        },
+      ],
+      pitfalls: [
+        "Le deny implicite : une ACL sans aucun permit bloque tout le trafic de l'interface.",
+        "Wildcard ≠ masque : 0.0.0.255 pour un /24, pas 255.255.255.0.",
+        "Une seule ACL par interface, par sens et par protocole : la nouvelle remplace l'ancienne.",
+        "Une ACL out ne filtre pas le trafic émis par le routeur lui-même (ping, SSH sortant).",
+        "Appliquer à distance une ACL qui bloque ton propre SSH : prévois un reload in 10 avant, et reload cancel après.",
+      ],
+    },
   },
   {
     name: "Static / Default Routing",
@@ -648,6 +937,48 @@ show running-config | include ip route`,
 ping <IP_ADDRESS>
 traceroute <IP_ADDRESS>`,
     debug: ``,
+    id: "static",
+    requires: ["interfaces"],
+    guide: {
+      steps: [
+        {
+          title: "Route vers un réseau distant",
+          level: "req",
+          note: "Le next-hop est l'adresse du routeur voisin. Pense à la route retour sur l'autre routeur.",
+          config: `ip route <NETWORK> <SUBNET_MASK> <NEXT_HOP>`,
+          verify: `show ip route static
+ping <IP_ADDRESS>
+traceroute <IP_ADDRESS>`,
+        },
+        {
+          title: "Route par défaut",
+          level: "req",
+          note: "Tout ce qui n'a pas de route plus précise part par là, en général vers Internet. Elle apparaît comme Gateway of last resort.",
+          config: `ip route 0.0.0.0 0.0.0.0 <NEXT_HOP>`,
+          verify: `show ip route | include Gateway`,
+        },
+        {
+          title: "Route de secours (flottante)",
+          level: "opt",
+          note: "Distance administrative plus haute (ici 200) : elle n'entre dans la table que si la route principale disparaît.",
+          config: `ip route <NETWORK> <SUBNET_MASK> <BACKUP_NEXT_HOP> 200`,
+          verify: `show running-config | include ip route`,
+        },
+        {
+          title: "Route avec interface de sortie et next-hop",
+          level: "opt",
+          note: "Précise les deux : utile sur Ethernet, et la route disparaît si l'interface tombe.",
+          config: `ip route <NETWORK> <SUBNET_MASK> <EXIT_INTERFACE> <NEXT_HOP>`,
+          verify: `show ip route <NETWORK>`,
+        },
+      ],
+      pitfalls: [
+        "Oublier la route retour : le ping part, mais la réponse ne revient jamais.",
+        "Next-hop injoignable : la route n'entre pas dans la table de routage.",
+        "Route vers une interface Ethernet sans next-hop : le routeur fait de l'ARP pour chaque destination (proxy ARP).",
+        "Route flottante avec une distance plus basse que la principale : c'est elle qui est utilisée en permanence.",
+      ],
+    },
   },
   {
     name: "OSPF",
@@ -678,6 +1009,81 @@ debug ip ospf adj`,
     debug: `debug ip ospf adj
 debug ip ospf events
 undebug all`,
+    id: "ospf",
+    requires: ["interfaces"],
+    guide: {
+      steps: [
+        {
+          title: "Lancer OSPF et fixer le router-id",
+          level: "req",
+          note: "Le router-id doit être unique. Fixe-le avant de former les voisinages, sinon il faut clear ip ospf process pour qu'il soit pris en compte.",
+          config: `router ospf <PROCESS_ID>
+ router-id <ROUTER_ID>`,
+          verify: `show ip protocols`,
+        },
+        {
+          title: "Activer OSPF sur les interfaces",
+          level: "req",
+          note: "Toutes les interfaces dont l'IP est dans le réseau participent. Alternative plus précise : la commande ip ospf directement sur l'interface.",
+          config: `router ospf <PROCESS_ID>
+ network <NETWORK> <WILDCARD> area <AREA>
+! Ou, directement sur l'interface :
+interface <INTERFACE>
+ ip ospf <PROCESS_ID> area <AREA>`,
+          verify: `show ip ospf neighbor
+show ip ospf interface brief`,
+        },
+        {
+          title: "Rendre passives les interfaces sans voisin",
+          level: "reco",
+          note: "Le réseau reste annoncé mais aucun hello n'est envoyé côté LAN : pas de voisin pirate possible.",
+          config: `router ospf <PROCESS_ID>
+ passive-interface default
+ no passive-interface <INTERFACE>`,
+          verify: `show ip protocols`,
+        },
+        {
+          title: "Liens point-à-point",
+          level: "opt",
+          note: "Sur un lien entre deux routeurs seulement : pas d'élection DR/BDR, la contiguïté se forme plus vite.",
+          config: `interface <INTERFACE>
+ ip ospf network point-to-point`,
+          verify: `show ip ospf interface <INTERFACE>`,
+        },
+        {
+          title: "Annoncer la route par défaut",
+          level: "opt",
+          note: "Le routeur de sortie Internet la propage à tous. Il doit lui-même avoir une route par défaut (fiche Static).",
+          config: `router ospf <PROCESS_ID>
+ default-information originate`,
+          verify: `show ip route ospf`,
+        },
+        {
+          title: "Ajuster la bande passante de référence",
+          level: "opt",
+          note: "Par défaut, tout lien de 100 Mb/s ou plus a le même coût. À mettre à la même valeur sur tous les routeurs.",
+          config: `router ospf <PROCESS_ID>
+ auto-cost reference-bandwidth 10000`,
+          verify: `show ip ospf interface brief`,
+        },
+        {
+          title: "Authentifier les voisins",
+          level: "opt",
+          note: "Identique des deux côtés du lien. Empêche un routeur non autorisé de rejoindre OSPF.",
+          config: `interface <INTERFACE>
+ ip ospf authentication message-digest
+ ip ospf message-digest-key 1 md5 <KEY>`,
+          verify: `show ip ospf interface <INTERFACE>`,
+        },
+      ],
+      pitfalls: [
+        "Hello/dead timers, aire, masque ou type de réseau différents entre voisins : le voisinage ne se forme pas.",
+        "Deux routeurs avec le même router-id : adjacences instables et routes manquantes.",
+        "MTU différente : les voisins restent bloqués en EXSTART/EXCHANGE.",
+        "passive-interface sur un lien vers un autre routeur : plus de voisin sur ce lien.",
+        "Wildcard au lieu de masque (ou l'inverse) dans network : la mauvaise interface est activée.",
+      ],
+    },
   },
   {
     name: "HSRP",
@@ -701,6 +1107,77 @@ show standby brief`,
 show ip interface brief`,
     debug: `debug standby events
 debug standby errors`,
+    id: "hsrp",
+    requires: ["interfaces"],
+    guide: {
+      steps: [
+        {
+          title: "Créer le groupe et l'IP virtuelle",
+          level: "req",
+          prompt: "R1",
+          note: "L'IP virtuelle est la passerelle à donner aux PC. Elle est dans le même sous-réseau que l'interface, mais différente de son IP.",
+          config: `interface <INTERFACE>
+ standby version 2
+ standby <GROUP> ip <VIRTUAL_IP>`,
+          verify: `show standby brief`,
+        },
+        {
+          title: "Priorité et préemption sur le routeur principal",
+          level: "req",
+          prompt: "R1",
+          note: "La priorité la plus haute (100 par défaut) devient Active. preempt lui fait reprendre ce rôle quand il revient.",
+          config: `interface <INTERFACE>
+ standby <GROUP> priority 110
+ standby <GROUP> preempt`,
+          verify: `show standby brief`,
+        },
+        {
+          title: "Configurer le routeur de secours",
+          level: "req",
+          prompt: "R2",
+          note: "Même version, même groupe, même IP virtuelle. Attendu : R1 Active, R2 Standby.",
+          config: `interface <INTERFACE>
+ standby version 2
+ standby <GROUP> ip <VIRTUAL_IP>
+ standby <GROUP> preempt`,
+          verify: `show standby brief`,
+        },
+        {
+          title: "Suivre le lien vers Internet",
+          level: "reco",
+          prompt: "R1",
+          note: "Si le lien WAN de R1 tombe, sa priorité baisse de 20 (110 → 90, sous les 100 de R2) et R2 devient Active.",
+          config: `track 1 interface <WAN_INTERFACE> line-protocol
+interface <INTERFACE>
+ standby <GROUP> track 1 decrement 20`,
+          verify: `show track`,
+        },
+        {
+          title: "Authentifier HSRP",
+          level: "opt",
+          prompt: "R1",
+          note: "Même clé sur les deux routeurs : un équipement pirate ne peut pas prendre le rôle Active.",
+          config: `interface <INTERFACE>
+ standby <GROUP> authentication md5 key-string <KEY>`,
+          verify: `show standby`,
+        },
+        {
+          title: "Basculement plus rapide",
+          level: "opt",
+          prompt: "R1",
+          note: "Hello toutes les secondes, panne détectée en 3 s (au lieu de 3 s et 10 s).",
+          config: `interface <INTERFACE>
+ standby <GROUP> timers 1 3`,
+          verify: `show standby`,
+        },
+      ],
+      pitfalls: [
+        "Les PC ont l'IP réelle d'un routeur comme passerelle au lieu de l'IP virtuelle : pas de bascule.",
+        "Version ou numéro de groupe différent entre les routeurs : les deux se croient Active.",
+        "Pas de preempt : après une panne, le routeur principal revient mais reste Standby.",
+        "Décrément trop faible : la priorité de R1 reste au-dessus de celle de R2 et la bascule n'a pas lieu.",
+      ],
+    },
   },
   {
     name: "IPv6 / NDP / SLAAC",
@@ -725,6 +1202,78 @@ show ipv6 neighbors`,
 show ipv6 interface <INTERFACE>
 ping ipv6 <IPV6_ADDRESS>`,
     debug: `debug ipv6 nd`,
+    id: "ipv6",
+    requires: ["interfaces"],
+    guide: {
+      steps: [
+        {
+          title: "Activer le routage IPv6",
+          level: "req",
+          note: "Désactivé par défaut. Sans lui, le routeur ne route pas l'IPv6 et n'envoie pas de Router Advertisement (SLAAC impossible pour les clients).",
+          config: `ipv6 unicast-routing`,
+          verify: `show ipv6 interface brief`,
+        },
+        {
+          title: "Adresse globale sur l'interface",
+          level: "req",
+          note: "Préfixe en /64 sur un LAN : c'est indispensable pour SLAAC.",
+          config: `interface <INTERFACE>
+ ipv6 address <IPV6_PREFIX>/64
+ no shutdown`,
+          verify: `show ipv6 interface brief`,
+        },
+        {
+          title: "Adresse link-local lisible",
+          level: "reco",
+          note: "Les clients utilisent la link-local du routeur comme passerelle. FE80::1 est plus simple à lire et à dépanner que l'adresse générée.",
+          config: `interface <INTERFACE>
+ ipv6 address FE80::1 link-local`,
+          verify: `show ipv6 interface <INTERFACE>`,
+        },
+        {
+          title: "Ou bien : adresse EUI-64",
+          level: "opt",
+          note: "La partie hôte est calculée à partir de l'adresse MAC.",
+          config: `interface <INTERFACE>
+ ipv6 address <IPV6_PREFIX>/64 eui-64`,
+          verify: `show ipv6 interface brief`,
+        },
+        {
+          title: "Route par défaut IPv6",
+          level: "reco",
+          note: "Avec un next-hop link-local, il faut préciser l'interface de sortie.",
+          config: `ipv6 route ::/0 <NEXT_HOP>
+! Avec un next-hop link-local :
+ipv6 route ::/0 <INTERFACE> FE80::2`,
+          verify: `show ipv6 route`,
+        },
+        {
+          title: "DHCPv6 stateless pour le DNS",
+          level: "opt",
+          note: "SLAAC donne l'adresse, DHCPv6 donne les infos en plus (DNS). other-config-flag dit aux clients de le demander.",
+          config: `ipv6 dhcp pool <POOL_NAME>
+ dns-server <IPV6_DNS>
+interface <INTERFACE>
+ ipv6 nd other-config-flag
+ ipv6 dhcp server <POOL_NAME>`,
+          verify: `show ipv6 dhcp pool`,
+        },
+        {
+          title: "Routeur client SLAAC",
+          level: "opt",
+          note: "L'interface se configure seule à partir du préfixe annoncé par un autre routeur.",
+          config: `interface <INTERFACE>
+ ipv6 address autoconfig`,
+          verify: `show ipv6 interface brief`,
+        },
+      ],
+      pitfalls: [
+        "Oublier ipv6 unicast-routing : les interfaces ont une adresse mais rien n'est routé, et les clients SLAAC n'ont pas d'adresse.",
+        "Préfixe différent de /64 sur un LAN : SLAAC ne fonctionne pas.",
+        "Route avec next-hop link-local sans interface de sortie : refusée.",
+        "Bloquer tout l'ICMPv6 dans une ACL : NDP (l'équivalent d'ARP) ne fonctionne plus.",
+      ],
+    },
   },
   {
     name: "CDP / LLDP",
@@ -747,6 +1296,53 @@ show lldp neighbors detail`,
     troubleshoot: `show cdp interface
 show lldp interface`,
     debug: ``,
+    id: "cdp",
+    requires: ["basic"],
+    guide: {
+      steps: [
+        {
+          title: "Activer CDP",
+          level: "reco",
+          note: "Actif par défaut sur Cisco. Montre les voisins directs : nom, modèle, port, IP.",
+          config: `cdp run`,
+          verify: `show cdp neighbors
+show cdp neighbors detail`,
+        },
+        {
+          title: "Activer LLDP",
+          level: "reco",
+          note: "Standard IEEE, désactivé par défaut sur Cisco. Nécessaire avec des équipements d'autres marques et des téléphones IP non Cisco.",
+          config: `lldp run`,
+          verify: `show lldp neighbors
+show lldp neighbors detail`,
+        },
+        {
+          title: "Couper CDP et LLDP sur les ports exposés",
+          level: "reco",
+          note: "Sur les ports vers Internet ou vers des clients : ces protocoles révèlent le modèle, la version d'IOS et les adresses.",
+          config: `interface <INTERFACE>
+ no cdp enable
+ no lldp transmit
+ no lldp receive`,
+          verify: `show cdp interface <INTERFACE>
+show lldp interface <INTERFACE>`,
+        },
+        {
+          title: "Ajuster les timers",
+          level: "opt",
+          note: "Fréquence d'envoi et durée de validité des informations (en secondes).",
+          config: `cdp timer 60
+cdp holdtime 180`,
+          verify: `show cdp`,
+        },
+      ],
+      pitfalls: [
+        "Laisser CDP actif vers Internet : un attaquant connaît le modèle et la version d'IOS.",
+        "Chercher un voisin LLDP sans avoir tapé lldp run : il est désactivé par défaut sur Cisco.",
+        "CDP ne voit que les voisins directement connectés : pas les équipements derrière un autre switch.",
+        "Couper CDP sur un port de téléphone IP Cisco : le téléphone n'apprend plus son voice VLAN.",
+      ],
+    },
   },
   {
     name: "SSH",
@@ -775,6 +1371,65 @@ show crypto key mypubkey rsa`,
     troubleshoot: `show line vty 0 15
 show ip ssh`,
     debug: `debug ip ssh`,
+    id: "ssh",
+    requires: ["basic"],
+    guide: {
+      steps: [
+        {
+          title: "Nom de domaine",
+          level: "req",
+          note: "Les clés RSA sont nommées hostname.domaine : le hostname doit déjà avoir été changé (fiche Basic IOS).",
+          config: `ip domain-name <DOMAIN>`,
+        },
+        {
+          title: "Générer les clés RSA",
+          level: "req",
+          note: "2048 bits conseillés. Au moins 768 bits pour SSH version 2.",
+          config: `crypto key generate rsa modulus 2048`,
+          verify: `show crypto key mypubkey rsa`,
+        },
+        {
+          title: "Imposer SSH version 2",
+          level: "req",
+          note: "La version 1 a des failles connues.",
+          config: `ip ssh version 2`,
+          verify: `show ip ssh`,
+        },
+        {
+          title: "Compte local",
+          level: "req",
+          note: "Si ce n'est pas déjà fait dans Basic IOS.",
+          config: `username <USERNAME> privilege 15 secret <PASSWORD>`,
+          verify: `show running-config | include username`,
+        },
+        {
+          title: "Lignes VTY en SSH uniquement",
+          level: "req",
+          note: "Telnet est refusé, l'authentification se fait avec les comptes locaux.",
+          config: `line vty 0 15
+ login local
+ transport input ssh
+ exec-timeout 10 0`,
+          verify: `show line vty 0
+show ssh`,
+        },
+        {
+          title: "Durcir SSH",
+          level: "reco",
+          note: "Délai de connexion limité, peu d'essais, et blocage de 2 minutes après 3 échecs en 1 minute (contre la force brute).",
+          config: `ip ssh time-out 60
+ip ssh authentication-retries 3
+login block-for 120 attempts 3 within 60`,
+          verify: `show login`,
+        },
+      ],
+      pitfalls: [
+        "Hostname par défaut (Router ou Switch) : la génération des clés est refusée.",
+        "transport input ssh avant d'avoir généré les clés : plus aucun accès distant.",
+        "login local sans username : personne ne peut se connecter.",
+        "Pour limiter SSH à certaines adresses, il faut une ACL avec access-class (fiche ACL).",
+      ],
+    },
   },
   {
     name: "Port Security",
@@ -800,6 +1455,65 @@ show port-security address`,
     troubleshoot: `show interfaces status err-disabled
 show errdisable recovery`,
     debug: ``,
+    id: "portsec",
+    requires: ["vlan"],
+    guide: {
+      steps: [
+        {
+          title: "Mettre le port en mode access",
+          level: "req",
+          note: "La sécurité de port est refusée sur un port en mode dynamique.",
+          config: `interface <INTERFACE>
+ switchport mode access`,
+        },
+        {
+          title: "Activer la sécurité de port",
+          level: "req",
+          note: "Par défaut : 1 seule adresse MAC autorisée, et le port est coupé en cas de violation.",
+          config: `interface <INTERFACE>
+ switchport port-security`,
+          verify: `show port-security interface <INTERFACE>`,
+        },
+        {
+          title: "Nombre d'adresses MAC autorisées",
+          level: "reco",
+          note: "2 pour un PC derrière un téléphone IP (3 sur certains modèles, le téléphone pouvant compter dans les deux VLAN).",
+          config: `interface <INTERFACE>
+ switchport port-security maximum 2`,
+          verify: `show port-security interface <INTERFACE>`,
+        },
+        {
+          title: "Apprendre les adresses MAC (sticky)",
+          level: "reco",
+          note: "Les premières MAC vues sont enregistrées dans la running-config. Pense à sauvegarder.",
+          config: `interface <INTERFACE>
+ switchport port-security mac-address sticky`,
+          verify: `show port-security address`,
+        },
+        {
+          title: "Choisir l'action en cas de violation",
+          level: "reco",
+          note: "shutdown : port coupé (err-disabled). restrict : trames bloquées et journalisées, port actif. protect : bloquées sans log.",
+          config: `interface <INTERFACE>
+ switchport port-security violation shutdown`,
+          verify: `show port-security`,
+        },
+        {
+          title: "Réactivation automatique",
+          level: "opt",
+          note: "Le port coupé par une violation se réactive après 300 secondes.",
+          config: `errdisable recovery cause psecure-violation
+errdisable recovery interval 300`,
+          verify: `show errdisable recovery`,
+        },
+      ],
+      pitfalls: [
+        "Port en mode dynamique : la commande switchport port-security est refusée.",
+        "Adresses sticky non sauvegardées : elles sont perdues au redémarrage.",
+        "Port en err-disabled : il faut shutdown puis no shutdown (ou errdisable recovery).",
+        "maximum 1 sur un port avec téléphone IP + PC : violation immédiate.",
+      ],
+    },
   },
   {
     name: "DHCP Snooping / DAI",
@@ -828,6 +1542,75 @@ show ip arp inspection interfaces`,
 show interfaces status err-disabled`,
     debug: `debug ip dhcp snooping event
 debug ip arp inspection`,
+    id: "dhcpsnoop",
+    requires: ["vlan", "dhcp"],
+    guide: {
+      steps: [
+        {
+          title: "Activer le DHCP snooping",
+          level: "req",
+          note: "Les deux commandes sont nécessaires : l'activation globale et la liste des VLAN protégés.",
+          config: `ip dhcp snooping
+ip dhcp snooping vlan <VLAN_LIST>`,
+          verify: `show ip dhcp snooping`,
+        },
+        {
+          title: "Déclarer les ports de confiance",
+          level: "req",
+          note: "Seuls les ports vers le serveur DHCP ou vers le reste du réseau (uplinks) peuvent envoyer des réponses DHCP. Les autres ports sont non fiables.",
+          config: `interface <UPLINK_INTERFACE>
+ ip dhcp snooping trust`,
+          verify: `show ip dhcp snooping`,
+        },
+        {
+          title: "Désactiver l'insertion de l'option 82",
+          level: "reco",
+          note: "Si le serveur DHCP est un routeur Cisco, il rejette par défaut les requêtes où le switch a ajouté l'option 82 : les clients n'obtiennent plus d'adresse.",
+          config: `no ip dhcp snooping information option`,
+          verify: `show ip dhcp snooping binding`,
+        },
+        {
+          title: "Limiter le débit DHCP des ports d'accès",
+          level: "reco",
+          note: "Contre l'épuisement du pool (DHCP starvation). Au-delà de 10 paquets par seconde, le port est coupé.",
+          config: `interface range <INTERFACE_RANGE>
+ ip dhcp snooping limit rate 10`,
+          verify: `show ip dhcp snooping`,
+        },
+        {
+          title: "Activer l'inspection ARP (DAI)",
+          level: "req",
+          note: "Vérifie chaque ARP avec la table de DHCP snooping : bloque l'ARP spoofing. Les uplinks sont mis en confiance.",
+          config: `ip arp inspection vlan <VLAN_LIST>
+interface <UPLINK_INTERFACE>
+ ip arp inspection trust`,
+          verify: `show ip arp inspection
+show ip arp inspection interfaces`,
+        },
+        {
+          title: "Autoriser les hôtes à IP fixe",
+          level: "opt",
+          note: "Un équipement en IP statique n'est pas dans la table DHCP snooping : DAI le bloque sans cette ACL ARP.",
+          config: `arp access-list STATIC_HOSTS
+ permit ip host <IP_ADDRESS> mac host <MAC_ADDRESS>
+ip arp inspection filter STATIC_HOSTS vlan <VLAN_ID>`,
+          verify: `show ip arp inspection statistics`,
+        },
+        {
+          title: "Contrôles supplémentaires",
+          level: "opt",
+          note: "Vérifie aussi la cohérence entre les adresses MAC et IP de l'en-tête et celles du message ARP.",
+          config: `ip arp inspection validate src-mac dst-mac ip`,
+          verify: `show ip arp inspection`,
+        },
+      ],
+      pitfalls: [
+        "Oublier trust sur l'uplink : plus aucun client n'obtient d'adresse.",
+        "Option 82 avec un serveur DHCP IOS : requêtes rejetées, clients sans adresse.",
+        "Hôtes en IP fixe (serveurs, imprimantes) bloqués par DAI : il faut une ACL ARP.",
+        "limit rate trop bas : un port légitime passe en err-disabled.",
+      ],
+    },
   },
   {
     name: "EIGRP",
@@ -855,6 +1638,82 @@ show ip eigrp interfaces
 show ip eigrp topology all-links`,
     debug: `debug eigrp packets
 debug ip eigrp`,
+    id: "eigrp",
+    requires: ["interfaces"],
+    guide: {
+      steps: [
+        {
+          title: "Lancer EIGRP",
+          level: "req",
+          note: "Le numéro d'AS doit être identique sur tous les voisins.",
+          config: `router eigrp <AS_NUMBER>
+ eigrp router-id <ROUTER_ID>`,
+          verify: `show ip protocols`,
+        },
+        {
+          title: "Activer EIGRP sur les interfaces",
+          level: "req",
+          note: "Toutes les interfaces dont l'IP est dans ce réseau participent.",
+          config: `router eigrp <AS_NUMBER>
+ network <NETWORK> <WILDCARD>`,
+          verify: `show ip eigrp neighbors
+show ip eigrp interfaces`,
+        },
+        {
+          title: "Désactiver le résumé automatique",
+          level: "reco",
+          note: "Déjà désactivé par défaut depuis IOS 15, mais à vérifier : il casse les réseaux discontinus.",
+          config: `router eigrp <AS_NUMBER>
+ no auto-summary`,
+          verify: `show ip protocols`,
+        },
+        {
+          title: "Rendre passives les interfaces sans voisin",
+          level: "reco",
+          note: "Le réseau reste annoncé, mais aucun hello n'est envoyé côté LAN.",
+          config: `router eigrp <AS_NUMBER>
+ passive-interface default
+ no passive-interface <INTERFACE>`,
+          verify: `show ip protocols`,
+        },
+        {
+          title: "Ou bien : mode nommé",
+          level: "opt",
+          note: "Syntaxe moderne qui regroupe toute la configuration (y compris celle des interfaces) sous le processus.",
+          config: `router eigrp <NAME>
+ address-family ipv4 unicast autonomous-system <AS_NUMBER>
+  eigrp router-id <ROUTER_ID>
+  network <NETWORK> <WILDCARD>`,
+          verify: `show ip eigrp neighbors`,
+        },
+        {
+          title: "Résumé manuel",
+          level: "opt",
+          note: "Annonce un seul préfixe résumé sur cette interface, au lieu de tous les sous-réseaux.",
+          config: `interface <INTERFACE>
+ ip summary-address eigrp <AS_NUMBER> <NETWORK> <SUBNET_MASK>`,
+          verify: `show ip route eigrp`,
+        },
+        {
+          title: "Authentifier les voisins",
+          level: "opt",
+          note: "Même key chain et même clé des deux côtés.",
+          config: `key chain <KEYCHAIN>
+ key 1
+  key-string <KEY>
+interface <INTERFACE>
+ ip authentication mode eigrp <AS_NUMBER> md5
+ ip authentication key-chain eigrp <AS_NUMBER> <KEYCHAIN>`,
+          verify: `show ip eigrp neighbors`,
+        },
+      ],
+      pitfalls: [
+        "Numéro d'AS différent entre voisins : aucun voisinage.",
+        "K-values ou authentification différentes : le voisinage ne se forme pas (message dans les logs).",
+        "passive-interface sur un lien vers un autre routeur : plus de voisin sur ce lien.",
+        "auto-summary sur un réseau discontinu : routes résumées incorrectes et trafic perdu.",
+      ],
+    },
   },
   {
     name: "BGP",
@@ -881,6 +1740,84 @@ show ip bgp neighbors <PEER_IP> received-routes`,
     debug: `debug ip bgp updates
 debug ip bgp events
 clear ip bgp <PEER_IP> soft`,
+    id: "bgp",
+    requires: ["interfaces"],
+    guide: {
+      steps: [
+        {
+          title: "Lancer BGP",
+          level: "req",
+          note: "Un seul processus BGP par routeur, avec le numéro d'AS de ton réseau. log-neighbor-changes journalise les sessions qui montent et tombent.",
+          config: `router bgp <LOCAL_AS>
+ bgp router-id <ROUTER_ID>
+ bgp log-neighbor-changes`,
+          verify: `show ip bgp summary`,
+        },
+        {
+          title: "Déclarer les voisins",
+          level: "req",
+          note: "AS différent = eBGP, même AS = iBGP. Les voisins se configurent à la main, des deux côtés. Attendu : un nombre dans la colonne State/PfxRcd.",
+          config: `router bgp <LOCAL_AS>
+ neighbor <PEER_IP> remote-as <REMOTE_AS>
+ neighbor <PEER_IP> description <TEXT>`,
+          verify: `show ip bgp summary
+show ip bgp neighbors <PEER_IP>`,
+        },
+        {
+          title: "Annoncer les réseaux",
+          level: "req",
+          note: "Le préfixe doit exister exactement (même masque) dans la table de routage. Sinon, crée une route vers Null0.",
+          config: `router bgp <LOCAL_AS>
+ network <NETWORK> mask <SUBNET_MASK>
+! Si le réseau n'est pas dans la table de routage :
+ip route <NETWORK> <SUBNET_MASK> Null0`,
+          verify: `show ip bgp`,
+        },
+        {
+          title: "Authentifier la session",
+          level: "reco",
+          note: "Mot de passe MD5 sur la session TCP, identique des deux côtés.",
+          config: `router bgp <LOCAL_AS>
+ neighbor <PEER_IP> password <KEY>`,
+          verify: `show ip bgp neighbors <PEER_IP> | include state`,
+        },
+        {
+          title: "Filtrer les annonces",
+          level: "reco",
+          note: "N'annonce que tes propres préfixes : évite de devenir un réseau de transit par erreur.",
+          config: `ip prefix-list <PL_NAME> seq 5 permit <NETWORK>/<PREFIX_LEN>
+router bgp <LOCAL_AS>
+ neighbor <PEER_IP> prefix-list <PL_NAME> out`,
+          verify: `clear ip bgp <PEER_IP> soft out
+show ip bgp neighbors <PEER_IP> advertised-routes`,
+        },
+        {
+          title: "iBGP entre loopbacks",
+          level: "opt",
+          note: "La session survit à la panne d'un lien. Les loopbacks doivent être joignables par l'IGP (OSPF, EIGRP). next-hop-self évite un next-hop eBGP injoignable.",
+          config: `router bgp <LOCAL_AS>
+ neighbor <PEER_IP> remote-as <LOCAL_AS>
+ neighbor <PEER_IP> update-source Loopback0
+ neighbor <PEER_IP> next-hop-self`,
+          verify: `show ip bgp summary`,
+        },
+        {
+          title: "eBGP entre loopbacks",
+          level: "opt",
+          note: "En eBGP, le voisin doit par défaut être directement connecté (TTL 1).",
+          config: `router bgp <LOCAL_AS>
+ neighbor <PEER_IP> ebgp-multihop 2
+ neighbor <PEER_IP> update-source Loopback0`,
+          verify: `show ip bgp summary`,
+        },
+      ],
+      pitfalls: [
+        "network avec un masque qui n'est pas exactement dans la table de routage : le préfixe n'est pas annoncé.",
+        "Voisin bloqué en Active : la session TCP 179 ne s'établit pas (IP, AS, route ou ACL).",
+        "iBGP : une route apprise d'un voisin iBGP n'est pas transmise aux autres. Il faut un maillage complet (ou des route reflectors).",
+        "Next-hop eBGP injoignable dans l'AS : la route est dans show ip bgp mais pas dans la table de routage. Utilise next-hop-self.",
+      ],
+    },
   },
   {
     name: "Route Maps / Redistribution",
@@ -904,6 +1841,83 @@ show ip route`,
     troubleshoot: `show route-map <MAP_NAME>
 show ip ospf database external`,
     debug: ``,
+    id: "routemap",
+    requires: ["ospf", "eigrp"],
+    guide: {
+      steps: [
+        {
+          title: "Sélectionner les routes",
+          level: "req",
+          note: "Une prefix-list est plus précise qu'une ACL pour désigner des réseaux (préfixe et longueur de masque).",
+          config: `ip prefix-list <PL_NAME> seq 5 permit <NETWORK>/<PREFIX_LEN>`,
+          verify: `show ip prefix-list <PL_NAME>`,
+        },
+        {
+          title: "Écrire la route-map",
+          level: "req",
+          note: "Les séquences sont lues dans l'ordre. Une route-map finit par un deny implicite : la séquence 20 vide laisse passer les autres routes sans les modifier.",
+          config: `route-map <MAP_NAME> permit 10
+ match ip address prefix-list <PL_NAME>
+ set metric <VALUE>
+ set tag <TAG>
+route-map <MAP_NAME> permit 20`,
+          verify: `show route-map <MAP_NAME>`,
+        },
+        {
+          title: "Redistribuer EIGRP dans OSPF",
+          level: "req",
+          note: "subnets est indispensable, sinon seuls les réseaux de classe entière (sans sous-réseau) passent.",
+          config: `router ospf <PROCESS_ID>
+ redistribute eigrp <AS_NUMBER> subnets route-map <MAP_NAME>`,
+          verify: `show ip ospf database external
+show ip route ospf`,
+        },
+        {
+          title: "Redistribuer OSPF dans EIGRP",
+          level: "req",
+          note: "EIGRP a besoin d'une métrique de départ (bande passante, délai, fiabilité, charge, MTU). Sans elle, les routes ne sont pas annoncées.",
+          config: `router eigrp <AS_NUMBER>
+ redistribute ospf <PROCESS_ID> metric 100000 10 255 1 1500`,
+          verify: `show ip route eigrp`,
+        },
+        {
+          title: "Éviter les boucles avec des tags",
+          level: "reco",
+          note: "Avec deux points de redistribution, une route peut revenir dans son protocole d'origine. On marque chaque route redistribuée et on refuse celles qui portent déjà le tag de l'autre sens.",
+          config: `route-map EIGRP_TO_OSPF deny 10
+ match tag 110
+route-map EIGRP_TO_OSPF permit 20
+ set tag 90
+route-map OSPF_TO_EIGRP deny 10
+ match tag 90
+route-map OSPF_TO_EIGRP permit 20
+ set tag 110
+router ospf <PROCESS_ID>
+ redistribute eigrp <AS_NUMBER> subnets route-map EIGRP_TO_OSPF
+router eigrp <AS_NUMBER>
+ redistribute ospf <PROCESS_ID> metric 100000 10 255 1 1500 route-map OSPF_TO_EIGRP`,
+          verify: `show ip route <NETWORK>`,
+        },
+        {
+          title: "Routage selon la source (PBR)",
+          level: "opt",
+          note: "Une route-map peut aussi forcer un chemin pour un trafic choisi, sans tenir compte de la table de routage. Elle s'applique sur l'interface d'entrée.",
+          config: `route-map PBR permit 10
+ match ip address <ACL_NAME>
+ set ip next-hop <NEXT_HOP>
+interface <INTERFACE>
+ ip policy route-map PBR`,
+          verify: `show ip policy
+show route-map PBR`,
+        },
+      ],
+      pitfalls: [
+        "Deny implicite en fin de route-map : sans séquence permit finale, les routes non sélectionnées sont rejetées.",
+        "Oublier subnets dans OSPF : les sous-réseaux ne sont pas redistribués.",
+        "Pas de métrique de départ dans EIGRP : les routes redistribuées sont ignorées.",
+        "Redistribution mutuelle à plusieurs endroits sans tags : boucles de routage et routes instables.",
+      ],
+    },
   },
   {
     name: "VRF",
@@ -926,6 +1940,62 @@ show ip interface brief vrf <VRF_NAME>`,
     troubleshoot: `ping vrf <VRF_NAME> <IP_ADDRESS>
 traceroute vrf <VRF_NAME> <IP_ADDRESS>`,
     debug: ``,
+    id: "vrf",
+    requires: ["interfaces"],
+    guide: {
+      steps: [
+        {
+          title: "Créer la VRF",
+          level: "req",
+          note: "Une table de routage séparée. Les réseaux de deux VRF peuvent utiliser les mêmes adresses sans conflit.",
+          config: `vrf definition <VRF_NAME>
+ address-family ipv4`,
+          verify: `show vrf`,
+        },
+        {
+          title: "Placer les interfaces dans la VRF",
+          level: "req",
+          note: "vrf forwarding efface l'adresse IP de l'interface : configure-la après.",
+          config: `interface <INTERFACE>
+ vrf forwarding <VRF_NAME>
+ ip address <IP_ADDRESS> <SUBNET_MASK>
+ no shutdown`,
+          verify: `show ip interface brief vrf <VRF_NAME>
+show vrf`,
+        },
+        {
+          title: "Routes statiques dans la VRF",
+          level: "reco",
+          note: "Chaque VRF a ses propres routes.",
+          config: `ip route vrf <VRF_NAME> <NETWORK> <SUBNET_MASK> <NEXT_HOP>`,
+          verify: `show ip route vrf <VRF_NAME>`,
+        },
+        {
+          title: "OSPF dans la VRF",
+          level: "opt",
+          note: "Un processus OSPF par VRF.",
+          config: `router ospf <PROCESS_ID> vrf <VRF_NAME>
+ network <NETWORK> <WILDCARD> area <AREA>`,
+          verify: `show ip ospf neighbor`,
+        },
+        {
+          title: "VRF-lite sur un trunk",
+          level: "opt",
+          note: "Une sous-interface par VRF sur le même lien physique, pour transporter plusieurs VRF entre deux routeurs.",
+          config: `interface <INTERFACE>.<VLAN_ID>
+ encapsulation dot1Q <VLAN_ID>
+ vrf forwarding <VRF_NAME>
+ ip address <IP_ADDRESS> <SUBNET_MASK>`,
+          verify: `ping vrf <VRF_NAME> <IP_ADDRESS>
+traceroute vrf <VRF_NAME> <IP_ADDRESS>`,
+        },
+      ],
+      pitfalls: [
+        "vrf forwarding après l'adresse IP : l'adresse est effacée sans prévenir clairement.",
+        "ping ou show ip route sans le mot-clé vrf : on regarde la table globale, pas celle de la VRF.",
+        "Route statique sans vrf : elle va dans la table globale.",
+      ],
+    },
   },
   {
     name: "NTP / Syslog / SNMP",
@@ -951,6 +2021,85 @@ show snmp`,
     troubleshoot: `show clock detail
 show ntp associations detail`,
     debug: `debug ntp packets`,
+    id: "ntp",
+    requires: ["basic"],
+    guide: {
+      steps: [
+        {
+          title: "Fuseau horaire et heure d'été",
+          level: "reco",
+          note: "Pour que les logs affichent l'heure locale. Exemple pour la France.",
+          config: `clock timezone CET 1 0
+clock summer-time CEST recurring last Sun Mar 2:00 last Sun Oct 3:00`,
+          verify: `show clock detail`,
+        },
+        {
+          title: "Synchroniser l'heure avec NTP",
+          level: "req",
+          note: "Sans heure juste, les logs ne servent à rien et les certificats peuvent être refusés. La synchronisation peut prendre quelques minutes.",
+          config: `ntp server <NTP_SERVER_IP>`,
+          verify: `show ntp status
+show ntp associations`,
+        },
+        {
+          title: "Horodater les logs",
+          level: "req",
+          note: "Date, heure en millisecondes et fuseau horaire sur chaque message.",
+          config: `service timestamps log datetime msec localtime show-timezone
+service timestamps debug datetime msec localtime show-timezone`,
+        },
+        {
+          title: "Envoyer les logs à un serveur Syslog",
+          level: "req",
+          note: "Niveau 6 (informational) et en dessous. source-interface fixe l'adresse source : choisis une loopback.",
+          config: `logging host <SYSLOG_IP>
+logging trap informational
+logging source-interface <INTERFACE>`,
+          verify: `show logging`,
+        },
+        {
+          title: "Garder les logs en mémoire",
+          level: "reco",
+          note: "Permet de les relire avec show logging, même sans serveur Syslog.",
+          config: `logging buffered 16384 informational`,
+          verify: `show logging`,
+        },
+        {
+          title: "Supervision SNMPv3",
+          level: "reco",
+          note: "v3 avec authentification et chiffrement : les communautés v2c circulent en clair.",
+          config: `snmp-server group <GROUP> v3 priv
+snmp-server user <USERNAME> <GROUP> v3 auth sha <AUTH_PASSWORD> priv aes 128 <PRIV_PASSWORD>`,
+          verify: `show snmp user
+show snmp group`,
+        },
+        {
+          title: "Ou bien : SNMPv2c limité",
+          level: "opt",
+          note: "En lecture seule et limité au serveur de supervision par une ACL.",
+          config: `ip access-list standard SNMP_ACL
+ permit host <NMS_IP>
+snmp-server community <COMMUNITY> ro SNMP_ACL`,
+          verify: `show snmp community`,
+        },
+        {
+          title: "Authentifier NTP",
+          level: "opt",
+          note: "Empêche un faux serveur NTP de dérégler l'horloge.",
+          config: `ntp authenticate
+ntp authentication-key 1 md5 <KEY>
+ntp trusted-key 1
+ntp server <NTP_SERVER_IP> key 1`,
+          verify: `show ntp associations detail`,
+        },
+      ],
+      pitfalls: [
+        "Horloge non synchronisée : impossible de recouper les logs de plusieurs équipements.",
+        "Communauté SNMP public ou private : ce sont les premières testées par un attaquant.",
+        "SNMP en rw sans ACL : n'importe qui connaissant la communauté peut modifier la configuration.",
+        "logging trap debugging en production : le serveur Syslog est inondé.",
+      ],
+    },
   },
   {
     name: "AAA / RADIUS / TACACS+",
@@ -975,6 +2124,79 @@ show running-config | section aaa`,
     troubleshoot: `test aaa group radius <USER> <PASSWORD> new-code`,
     debug: `debug aaa authentication
 debug radius`,
+    id: "aaa",
+    requires: ["ssh"],
+    guide: {
+      steps: [
+        {
+          title: "Créer un compte local de secours",
+          level: "req",
+          note: "À faire avant aaa new-model : dès cette commande, les lignes VTY demandent un compte local. Il servira aussi si le serveur ne répond plus.",
+          config: `username <USERNAME> privilege 15 secret <PASSWORD>`,
+          verify: `show running-config | include username`,
+        },
+        {
+          title: "Activer AAA",
+          level: "req",
+          note: "Remplace l'authentification classique des lignes par les listes de méthodes AAA.",
+          config: `aaa new-model`,
+          verify: `show running-config | section aaa`,
+        },
+        {
+          title: "Déclarer le serveur RADIUS",
+          level: "req",
+          note: "Le secret doit être identique sur le serveur. Ports standards : 1812 (authentification) et 1813 (comptabilité).",
+          config: `radius server <NAME>
+ address ipv4 <SERVER_IP> auth-port 1812 acct-port 1813
+ key <SECRET>`,
+          verify: `show aaa servers`,
+        },
+        {
+          title: "Regrouper les serveurs",
+          level: "reco",
+          note: "Le groupe permet d'avoir plusieurs serveurs. L'adresse source doit être celle déclarée comme client sur le serveur.",
+          config: `aaa group server radius <GROUP_NAME>
+ server name <NAME>
+ip radius source-interface <INTERFACE>`,
+          verify: `show aaa servers`,
+        },
+        {
+          title: "Méthodes d'authentification",
+          level: "req",
+          note: "Serveur d'abord, comptes locaux si le serveur ne répond pas. La console garde une liste séparée, en local : on peut toujours se connecter en cas de panne réseau.",
+          config: `aaa authentication login default group <GROUP_NAME> local
+aaa authentication login CONSOLE local
+line console 0
+ login authentication CONSOLE`,
+          verify: `test aaa group <GROUP_NAME> <USERNAME> <PASSWORD> new-code`,
+        },
+        {
+          title: "Autorisation et comptabilité",
+          level: "reco",
+          note: "Le serveur décide du niveau de privilège, et garde une trace des connexions.",
+          config: `aaa authorization exec default group <GROUP_NAME> local
+aaa accounting exec default start-stop group <GROUP_NAME>`,
+          verify: `show aaa sessions`,
+        },
+        {
+          title: "Ou bien : TACACS+",
+          level: "opt",
+          note: "Chiffre tout le paquet et permet d'autoriser commande par commande. Plutôt pour l'administration des équipements, RADIUS pour l'accès des utilisateurs.",
+          config: `tacacs server <NAME>
+ address ipv4 <SERVER_IP>
+ key <SECRET>
+aaa authentication login default group tacacs+ local
+aaa authorization commands 15 default group tacacs+ local`,
+          verify: `show tacacs`,
+        },
+      ],
+      pitfalls: [
+        "aaa new-model sans compte local : plus personne ne peut se connecter en SSH.",
+        "Secret différent sur le serveur : toutes les authentifications échouent.",
+        "La méthode local n'est utilisée que si le serveur ne répond pas : un mot de passe refusé par le serveur ne bascule pas en local.",
+        "Adresse source différente de celle déclarée sur le serveur : les requêtes sont ignorées.",
+      ],
+    },
   },
   {
     name: "PVLAN",
@@ -994,7 +2216,7 @@ vlan <PRIMARY_VLAN>
 ! Configure le port promiscuous : il peut parler à tous les ports du PVLAN
 interface <PROMISCUOUS_INTERFACE>
  switchport mode private-vlan promiscuous
- switchport private-vlan mapping <SECONDARY_VLAN>
+ switchport private-vlan mapping <PRIMARY_VLAN> <SECONDARY_VLAN>
 ! Configure le port isolé : il ne peut parler qu'au port promiscuous
 interface <ISOLATED_INTERFACE>
  switchport mode private-vlan host
@@ -1006,6 +2228,72 @@ show mac address-table`,
 show interfaces <INTERFACE> switchport
 show mac address-table`,
     debug: ``,
+    id: "pvlan",
+    requires: ["vlan"],
+    guide: {
+      steps: [
+        {
+          title: "Passer VTP en mode transparent",
+          level: "req",
+          note: "Les private VLAN ne sont acceptés qu'en mode VTP transparent (ou VTP version 3).",
+          config: `vtp mode transparent`,
+          verify: `show vtp status`,
+        },
+        {
+          title: "Créer les VLAN secondaires",
+          level: "req",
+          note: "isolated : les ports ne parlent qu'au port promiscuous. community : les ports d'une même communauté se parlent entre eux et au promiscuous.",
+          config: `vlan <ISOLATED_VLAN>
+ private-vlan isolated
+vlan <COMMUNITY_VLAN>
+ private-vlan community`,
+        },
+        {
+          title: "Créer le VLAN primaire et l'associer",
+          level: "req",
+          note: "Le VLAN primaire regroupe les VLAN secondaires.",
+          config: `vlan <PRIMARY_VLAN>
+ private-vlan primary
+ private-vlan association <ISOLATED_VLAN>,<COMMUNITY_VLAN>`,
+          verify: `show vlan private-vlan`,
+        },
+        {
+          title: "Configurer le port promiscuous",
+          level: "req",
+          note: "En général le port vers le routeur ou le pare-feu : il parle à tous les ports du PVLAN.",
+          config: `interface <PROMISCUOUS_INTERFACE>
+ switchport mode private-vlan promiscuous
+ switchport private-vlan mapping <PRIMARY_VLAN> <ISOLATED_VLAN>,<COMMUNITY_VLAN>`,
+          verify: `show interfaces <PROMISCUOUS_INTERFACE> switchport`,
+        },
+        {
+          title: "Configurer les ports hôtes",
+          level: "req",
+          note: "Chaque port hôte est associé au VLAN primaire et à un seul VLAN secondaire.",
+          config: `interface <INTERFACE>
+ switchport mode private-vlan host
+ switchport private-vlan host-association <PRIMARY_VLAN> <ISOLATED_VLAN>`,
+          verify: `show interfaces <INTERFACE> switchport
+show vlan private-vlan`,
+        },
+        {
+          title: "Passerelle sur un switch L3 (SVI)",
+          level: "opt",
+          note: "Si le routage se fait sur le switch : la SVI du VLAN primaire joue le rôle de port promiscuous.",
+          config: `interface vlan <PRIMARY_VLAN>
+ private-vlan mapping <ISOLATED_VLAN>,<COMMUNITY_VLAN>
+ ip address <IP_ADDRESS> <SUBNET_MASK>
+ no shutdown`,
+          verify: `show interfaces vlan <PRIMARY_VLAN> private-vlan mapping`,
+        },
+      ],
+      pitfalls: [
+        "VTP en mode server ou client : les commandes private-vlan sont refusées.",
+        "Un seul VLAN isolé par VLAN primaire (mais plusieurs VLAN communautaires possibles).",
+        "Oublier un VLAN secondaire dans le mapping du port promiscuous : ses hôtes n'atteignent plus la passerelle.",
+        "Tous les hôtes du PVLAN partagent le même sous-réseau IP, celui du VLAN primaire.",
+      ],
+    },
   },
   {
     name: "VOIP",
@@ -1037,5 +2325,81 @@ show mls qos interface`,
 show interfaces <INTERFACE> switchport
 show mls qos interface`,
     debug: ``,
+    id: "voip",
+    requires: ["vlan"],
+    guide: {
+      steps: [
+        {
+          title: "Créer le VLAN voix",
+          level: "req",
+          note: "La voix est séparée des données : QoS et sécurité plus simples.",
+          config: `vlan <VOICE_VLAN>
+ name VOICE`,
+          verify: `show vlan brief`,
+        },
+        {
+          title: "Port d'accès avec voice VLAN",
+          level: "req",
+          note: "Le téléphone apprend le VLAN voix par CDP (ou LLDP-MED) et étiquette son trafic. Le PC branché derrière reste dans le VLAN données, sans étiquette.",
+          config: `interface <INTERFACE>
+ switchport mode access
+ switchport access vlan <DATA_VLAN>
+ switchport voice vlan <VOICE_VLAN>
+ spanning-tree portfast`,
+          verify: `show interfaces <INTERFACE> switchport`,
+        },
+        {
+          title: "Activer la QoS et faire confiance au téléphone",
+          level: "reco",
+          note: "Le marquage CoS n'est conservé que si un téléphone Cisco est détecté par CDP : un PC ne peut pas se faire passer pour un téléphone.",
+          config: `mls qos
+interface <INTERFACE>
+ mls qos trust device cisco-phone
+ mls qos trust cos`,
+          verify: `show mls qos interface <INTERFACE>`,
+        },
+        {
+          title: "Ou bien : AutoQoS",
+          level: "opt",
+          note: "Génère automatiquement toute la configuration QoS pour un téléphone Cisco (files d'attente, confiance, marquage).",
+          config: `interface <INTERFACE>
+ auto qos voip cisco-phone`,
+          verify: `show auto qos interface <INTERFACE>`,
+        },
+        {
+          title: "Alimenter le téléphone en PoE",
+          level: "opt",
+          note: "auto est la valeur par défaut sur les switchs PoE.",
+          config: `interface <INTERFACE>
+ power inline auto`,
+          verify: `show power inline <INTERFACE>`,
+        },
+        {
+          title: "Adapter la sécurité de port",
+          level: "opt",
+          note: "Le téléphone et le PC ont chacun une adresse MAC ; selon les modèles, le téléphone compte aussi dans le VLAN données.",
+          config: `interface <INTERFACE>
+ switchport port-security maximum 3`,
+          verify: `show port-security interface <INTERFACE>`,
+        },
+        {
+          title: "Option DHCP 150 pour les téléphones",
+          level: "opt",
+          prompt: "R1",
+          note: "Donne aux téléphones Cisco l'adresse du serveur TFTP qui contient leur configuration.",
+          config: `ip dhcp pool VOICE
+ network <NETWORK> <SUBNET_MASK>
+ default-router <GATEWAY_IP>
+ option 150 ip <TFTP_IP>`,
+          verify: `show ip dhcp binding`,
+        },
+      ],
+      pitfalls: [
+        "mls qos activé sans trust : tous les marquages sont remis à 0, la voix perd sa priorité.",
+        "VLAN voix non autorisé sur le trunk vers le cœur : le téléphone a un lien mais ne joint pas son serveur.",
+        "CDP ou LLDP désactivé sur le port : le téléphone ne connaît pas le VLAN voix et reste dans le VLAN données.",
+        "Port security avec maximum 1 : violation dès que le téléphone et le PC sont branchés.",
+      ],
+    },
   }
 ];
