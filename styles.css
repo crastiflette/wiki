@@ -423,6 +423,7 @@ pre {
   aside {
     width: auto;
     position: relative; /* sert d'ancre au menu déroulant */
+    align-self: stretch; /* pleine largeur (sur ordinateur, flex-start garde la barre collante) */
     max-height: none;
     flex-direction: row;
     align-items: center;
