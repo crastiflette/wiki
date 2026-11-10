@@ -597,16 +597,17 @@ errdisable recovery interval 300`,
     },
   },
   {
-    name: "EtherChannel / LACP",
+    name: "EtherChannel / LACP / PAgP",
     level: "CCNA",
     category: "",
     prompt: "SW1",
     description:
-      "L'EtherChannel regroupe plusieurs liens physiques en un seul lien logique : plus de bande passante et de la redondance. STP le voit comme un seul lien, donc aucun port n'est bloqué. LACP (802.3ad) négocie le groupe avec l'autre équipement ; les paramètres des ports doivent être identiques des deux côtés.",
+      "L'EtherChannel regroupe plusieurs liens physiques en un seul lien logique : plus de bande passante et de la redondance. STP le voit comme un seul lien, donc aucun port n'est bloqué. LACP (standard IEEE 802.3ad) ou PAgP (propriétaire Cisco) négocie le groupe avec l'autre équipement ; les deux côtés doivent utiliser le même protocole et les paramètres des ports doivent être identiques des deux côtés.",
     config: `! Sélectionne tous les ports physiques à regrouper
 interface range <INTERFACE_RANGE>
  ! Les place dans le groupe ; active = ce switch propose LACP à l'autre extrémité
  channel-group <ID> mode active
+ ! Variante PAgP (Cisco uniquement) : channel-group <ID> mode desirable
 ! Interface logique créée automatiquement : les réglages (trunk, VLAN...) se font ici
 interface port-channel <ID>
  switchport mode trunk`,
@@ -615,8 +616,10 @@ show interfaces port-channel <ID>
 show etherchannel port-channel`,
     troubleshoot: `show etherchannel summary
 show lacp neighbor
+show pagp neighbor
 show running-config interface <INTERFACE>`,
     debug: `debug lacp packet
+debug pagp packet
 debug etherchannel`,
     id: "etherchannel",
     requires: ["trunk"],
@@ -630,14 +633,27 @@ debug etherchannel`,
  shutdown`,
         },
         {
+          section: "Méthode 1 : LACP (standard IEEE 802.3ad)",
           title: "Regrouper les ports avec LACP",
           level: "req",
-          note: "active : ce switch propose LACP. Au moins un des deux côtés doit être en active.",
+          note: "active : ce switch propose LACP. passive : il attend que l'autre côté le propose. Au moins un des deux côtés doit être en active. À privilégier : fonctionne avec tous les constructeurs.",
           config: `interface range <INTERFACE_RANGE>
  channel-group <ID> mode active`,
-          verify: `show etherchannel summary`,
+          verify: `show etherchannel summary
+show lacp neighbor`,
         },
         {
+          section: "Méthode 2 : PAgP (propriétaire Cisco)",
+          title: "Regrouper les ports avec PAgP",
+          level: "req",
+          note: "desirable : ce switch propose PAgP. auto : il attend que l'autre côté le propose. Au moins un des deux côtés doit être en desirable. Seulement entre équipements Cisco.",
+          config: `interface range <INTERFACE_RANGE>
+ channel-group <ID> mode desirable`,
+          verify: `show etherchannel summary
+show pagp neighbor`,
+        },
+        {
+          section: "Ensuite, quelle que soit la méthode",
           title: "Configurer l'interface port-channel",
           level: "req",
           note: "Les réglages se font sur le port-channel : ils sont recopiés sur les ports membres.",
@@ -656,7 +672,8 @@ debug etherchannel`,
           config: `interface range <INTERFACE_RANGE>
  no shutdown`,
           verify: `show etherchannel summary
-show lacp neighbor`,
+show lacp neighbor
+show pagp neighbor`,
         },
         {
           title: "Choisir la répartition de charge",
@@ -667,7 +684,7 @@ show lacp neighbor`,
         },
       ],
       pitfalls: [
-        "Modes incompatibles : passive des deux côtés, ou on face à active, et le groupe ne se forme pas.",
+        "Modes incompatibles : passive des deux côtés (LACP), auto des deux côtés (PAgP), ou on face à active/desirable, et le groupe ne se forme pas.",
         "Ports membres configurés différemment (VLAN, mode, vitesse) : ils sont suspendus, (s) dans show etherchannel summary.",
         "Modifier un port membre au lieu du port-channel : la configuration n'est plus cohérente et le port sort du groupe.",
         "Mélanger LACP (active/passive) et PAgP (desirable/auto) : ce sont deux protocoles différents.",
