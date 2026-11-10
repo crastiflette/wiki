@@ -1055,8 +1055,7 @@ show ip ospf interface brief`,
           level: "reco",
           note: "Le réseau reste annoncé mais aucun hello n'est envoyé côté LAN : pas de voisin pirate possible.",
           config: `router ospf <PROCESS_ID>
- passive-interface default
- no passive-interface <INTERFACE>`,
+ passive-interface <INTERFACE>`,
           verify: `show ip protocols`,
         },
         {
