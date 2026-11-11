@@ -1,9 +1,12 @@
 <!doctype html>
 <!--
-  Cisco Cheat Sheet : site statique découpé en fichiers.
-    styles.css : thème, mise en page, cartes, blocs de code, mode entraînement
-    data.js    : les données (le tableau D, une entrée par technologie) — à éditer pour le contenu
-    app.js     : la logique (affichage, recherche, favoris, entraînement)
+  Cisco Cheat Sheet v2 : site statique découpé en fichiers.
+    styles.css : thème, mise en page, cartes, blocs de code, QCM
+    data.js    : les fiches (le tableau D, une entrée par technologie) — à éditer pour le contenu
+    extras.js  : schémas de topologie et exemples de sortie affichés dans le Guide
+    quiz.js    : les questions du mode Entraînement
+    app.js     : la logique (Guide, Référence, Favoris, Entraînement)
+  Historique des versions : CHANGELOG.md
 -->
 <html lang="fr">
   <head>
@@ -13,15 +16,22 @@
     <link rel="icon" type="image/png" href="logo_ciscocheatsheet.png" />
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <link rel="apple-touch-icon" href="logo_ciscocheatsheet.png" />
+    <!-- Applique le thème mémorisé avant l'affichage, pour éviter un flash clair / sombre -->
+    <script>
+      try {
+        var t = JSON.parse(localStorage.getItem("theme"));
+        if (t) document.documentElement.dataset.theme = t;
+      } catch (e) {}
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=JetBrains+Mono:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
-    <!-- ?v=N : augmenter N à chaque modification de styles.css, data.js ou app.js
+    <!-- ?v=N : augmenter N à chaque modification d'un fichier CSS ou JS
          pour que Cloudflare serve la nouvelle version au lieu de sa copie en cache -->
-    <link rel="stylesheet" href="styles.css?v=5" />
+    <link rel="stylesheet" href="styles.css?v=6" />
   </head>
   <body>
     <div class="app">
@@ -37,20 +47,16 @@
           </svg>
           <div>Cisco<br />Cheat Sheet<small>Commandes IOS</small></div>
         </div>
-        <nav id="nav"></nav>
+        <nav id="nav" aria-label="Vues"></nav>
         <button id="th" title="Basculer thème clair / sombre">◐ Thème</button>
+        <span id="verline"><span id="ver"></span> · <a href="v1/" title="Ouvrir l'ancienne version (v1.0)">version précédente</a></span>
         <button id="burger" aria-label="Ouvrir le menu" aria-expanded="false">☰</button>
       </aside>
       <main>
         <div class="hero">
           <label class="prompt"
             ><b>Switch#</b
-            ><input
-              id="q"
-              type="search"
-              placeholder="ospf neighbor, trunk, etherchannel…"
-              autocomplete="off"
-              aria-label="Rechercher une commande"
+            ><input id="q" type="search" autocomplete="off" aria-label="Rechercher une commande"
           /></label>
           <div class="bar" id="flt"></div>
           <div class="bar rec" id="rec"></div>
@@ -58,8 +64,10 @@
         <div id="out"></div>
       </main>
     </div>
-    <!-- data.js doit être chargé avant app.js (app.js utilise le tableau D) -->
-    <script src="data.js?v=7"></script>
-    <script src="app.js?v=5"></script>
+    <!-- Les données (data.js, extras.js, quiz.js) doivent être chargées avant app.js -->
+    <script src="data.js?v=8"></script>
+    <script src="extras.js?v=1"></script>
+    <script src="quiz.js?v=1"></script>
+    <script src="app.js?v=6"></script>
   </body>
 </html>

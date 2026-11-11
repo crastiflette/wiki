@@ -1,0 +1,68 @@
+<!doctype html>
+<!--
+  Cisco Cheat Sheet : site statique découpé en fichiers.
+    styles.css : thème, mise en page, cartes, blocs de code, mode entraînement
+    data.js    : les données (le tableau D, une entrée par technologie) — à éditer pour le contenu
+    app.js     : la logique (affichage, recherche, favoris, entraînement)
+-->
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Cisco Cheat Sheet (v1.0, archive)</title>
+    <meta name="robots" content="noindex" />
+    <link rel="icon" type="image/png" href="../logo_ciscocheatsheet.png" />
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+    <link rel="apple-touch-icon" href="../logo_ciscocheatsheet.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <!-- ?v=N : augmenter N à chaque modification de styles.css, data.js ou app.js
+         pour que Cloudflare serve la nouvelle version au lieu de sa copie en cache -->
+    <link rel="stylesheet" href="styles.css?v=5" />
+  </head>
+  <body>
+    <!-- Archive de la version 1.0, conservée pour comparaison. Version actuelle : ../ -->
+    <a href="../" style="display:block;background:#ffb020;color:#1a1200;text-align:center;padding:6px 10px;font:600 13px system-ui,sans-serif;text-decoration:none">Archive de la version 1.0 · revenir à la version actuelle →</a>
+    <div class="app">
+      <aside>
+        <div class="brand">
+          <svg width="30" height="26" viewBox="0 0 30 26" aria-hidden="true">
+            <g fill="#049fd9">
+              <rect x="0" y="16" width="5" height="10" rx="2.5" />
+              <rect x="8" y="10" width="5" height="16" rx="2.5" />
+              <rect x="16" y="5" width="5" height="21" rx="2.5" />
+              <rect x="24" y="0" width="5" height="26" rx="2.5" />
+            </g>
+          </svg>
+          <div>Cisco<br />Cheat Sheet<small>Commandes IOS</small></div>
+        </div>
+        <nav id="nav"></nav>
+        <button id="th" title="Basculer thème clair / sombre">◐ Thème</button>
+        <button id="burger" aria-label="Ouvrir le menu" aria-expanded="false">☰</button>
+      </aside>
+      <main>
+        <div class="hero">
+          <label class="prompt"
+            ><b>Switch#</b
+            ><input
+              id="q"
+              type="search"
+              placeholder="ospf neighbor, trunk, etherchannel…"
+              autocomplete="off"
+              aria-label="Rechercher une commande"
+          /></label>
+          <div class="bar" id="flt"></div>
+          <div class="bar rec" id="rec"></div>
+        </div>
+        <div id="out"></div>
+      </main>
+    </div>
+    <!-- data.js doit être chargé avant app.js (app.js utilise le tableau D) -->
+    <script src="data.js?v=7"></script>
+    <script src="app.js?v=5"></script>
+  </body>
+</html>
