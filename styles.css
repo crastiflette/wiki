@@ -1,3 +1,4 @@
+/* Cisco Cheat Sheet v2 */
 /* ===== Thème : couleurs (--bg fond, --pn cartes, --tx texte, --ac accent, --cb code) et polices ===== */
 :root {
   box-sizing: border-box;
@@ -88,7 +89,9 @@ aside {
   position: sticky;
   top: 0;
   align-self: flex-start;
-  max-height: 100vh;
+  /* Pleine hauteur de la fenêtre : la barre ne s'arrête plus au milieu de l'écran */
+  height: 100vh;
+  height: 100dvh;
   overflow: auto;
   display: flex;
   flex-direction: column;
@@ -115,21 +118,52 @@ nav {
   flex-direction: column;
   gap: 3px;
 }
-nav button {
-  text-align: left;
+nav a {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  text-decoration: none;
   padding: 9px 12px;
   border-radius: 9px;
   color: var(--sx);
   font-weight: 500;
 }
-nav button:hover {
+nav a:hover {
   background: #ffffff0f;
   color: #fff;
 }
-nav button.on {
+nav a.on {
   background: #ffffff17;
   color: #fff;
   box-shadow: inset 3px 0 0 #049fd9;
+}
+nav a:focus-visible,
+a.btn:focus-visible,
+select:focus-visible,
+.vars input:focus-visible {
+  outline: 2px solid var(--ac);
+  outline-offset: 2px;
+}
+/* Nombre de favoris */
+nav a small {
+  font: 600 11px var(--f2);
+  background: #ffffff1c;
+  border-radius: 99px;
+  padding: 1px 8px;
+}
+/* Numéro de version, en bas de la barre */
+#verline {
+  font: 500 11px var(--f2);
+  color: var(--sx);
+  opacity: 0.75;
+  padding: 0 6px;
+  margin-top: -12px;
+}
+#verline a {
+  color: inherit;
+}
+#verline a:hover {
+  color: #fff;
 }
 #th {
   margin-top: auto;
@@ -155,6 +189,9 @@ main {
   z-index: 5;
   padding: calc(18px + env(safe-area-inset-top, 0px)) 0 14px;
   background: linear-gradient(var(--bg) 82%, transparent);
+}
+.hero[hidden] {
+  display: none;
 }
 .prompt {
   display: flex;
@@ -202,7 +239,26 @@ main {
 .bar:empty {
   display: none;
 }
-#flt button {
+/* Filtres de la Référence : un groupe par critère */
+#flt {
+  gap: 8px 18px;
+}
+.fg {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.fg > span,
+.qcfg > div > span {
+  font: 700 11px var(--f1);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mu);
+  margin-right: 2px;
+}
+.fg button,
+.qcfg button {
   display: flex;
   align-items: center;
   gap: 7px;
@@ -212,8 +268,14 @@ main {
   background: var(--pn);
   color: var(--tx);
   font-weight: 500;
+  font-size: 13px;
 }
-#flt button::before {
+.fg button:hover,
+.qcfg button:hover {
+  border-color: var(--ac);
+}
+/* Voyant coloré des filtres de type (mêmes couleurs que les blocs) */
+.fg [data-f^="types:"]::before {
   content: "";
   width: 8px;
   height: 8px;
@@ -221,21 +283,22 @@ main {
   background: var(--led);
   box-shadow: 0 0 6px var(--led);
 }
-#flt button.on {
+.fg button.on,
+.qcfg button.on {
   background: var(--tx);
   color: var(--bg);
   border-color: var(--tx);
 }
-#flt [data-t="C"] {
+.fg [data-f="types:C"] {
   --led: var(--g);
 }
-#flt [data-t="S"] {
+.fg [data-f="types:S"] {
   --led: var(--b);
 }
-#flt [data-t="T"] {
+.fg [data-f="types:T"] {
   --led: var(--a);
 }
-#flt [data-t="D"] {
+.fg [data-f="types:D"] {
   --led: var(--r);
 }
 .rec button {
@@ -249,14 +312,14 @@ main {
   color: var(--ac);
   border-color: var(--ac);
 }
-/* Cartes des protocoles (colonnes automatiques) */
+/* Cartes des protocoles : grille lue de gauche à droite, ligne par ligne */
 .grid {
-  columns: 420px 3;
-  column-gap: 18px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+  gap: 14px;
+  align-items: start;
 }
 .card {
-  break-inside: avoid;
-  margin-bottom: 18px;
   background: var(--pn);
   border: 1px solid var(--bd);
   border-radius: 18px;
@@ -292,6 +355,113 @@ main {
   color: var(--mu);
   font-size: 14px;
   max-width: 62ch;
+}
+.card h2 a {
+  color: inherit;
+  text-decoration: none;
+}
+.card h2 a:hover {
+  color: var(--ac);
+}
+/* Barre au-dessus des cartes : nombre de résultats + actions */
+.rtool {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  color: var(--mu);
+  font-size: 14px;
+}
+.rtool span {
+  margin-right: auto;
+}
+.rtool button {
+  padding: 5px 12px;
+  border-radius: 9px;
+  border: 1px solid var(--bd);
+  background: var(--pn);
+  color: var(--tx);
+  font-weight: 600;
+  font-size: 13px;
+}
+.rtool button:hover {
+  border-color: var(--ac);
+  color: var(--ac);
+}
+/* Carte de la Référence : repliée par défaut, un clic sur le titre la déplie */
+.rc {
+  padding: 14px 16px;
+}
+.rc h2 {
+  font-size: 19px;
+}
+.rch {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  letter-spacing: inherit;
+}
+.rch:disabled {
+  cursor: default;
+}
+.rch .chev {
+  margin-left: auto;
+  font-style: normal;
+  font-size: 14px;
+  color: var(--mu);
+}
+.rch:not(:disabled):hover > span:first-child,
+.rch:not(:disabled):hover .chev {
+  color: var(--ac);
+}
+.rc p {
+  margin: 6px 0 0;
+}
+.rc p.clip {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.rn {
+  display: block;
+  margin-top: 8px;
+  font: 500 11px var(--f2);
+  color: var(--mu);
+}
+/* Carte dépliée : toute la largeur, blocs sur deux colonnes */
+.rc.x:not(.s) {
+  grid-column: 1 / -1;
+}
+.rc.x:not(.s) p {
+  max-width: 80ch;
+}
+.rc.x:not(.s) .rcb {
+  columns: 380px 2;
+  column-gap: 14px;
+}
+.rcb .blk {
+  break-inside: avoid;
+}
+.more,
+.why a,
+.corr a {
+  display: inline-block;
+  margin-top: 12px;
+  color: var(--ac);
+  font-weight: 600;
+  font-size: 14px;
+  text-decoration: none;
+}
+.more:hover,
+.why a:hover,
+.corr a:hover {
+  text-decoration: underline;
 }
 /* Blocs de commandes : voyant coloré = type de bloc */
 .blk {
@@ -377,14 +547,27 @@ pre {
   min-width: 0;
 }
 .st {
-  opacity: 0.2;
+  opacity: 0.75;
   color: var(--n);
   padding: 0 4px 0 12px;
-  font-size: 15px;
+  font-size: 16px;
+  line-height: 1;
+  align-self: stretch;
 }
 .l:hover .st,
+.st:hover,
+.st:focus-visible,
 .st.f {
   opacity: 1;
+}
+/* Favoris : lignes parentes rappelées en grisé, favoris séparés par un filet */
+.l.par {
+  opacity: 0.55;
+}
+.fv + .fv {
+  border-top: 1px solid #ffffff12;
+  margin-top: 4px;
+  padding-top: 4px;
 }
 /* Couleurs de la coloration : .k commande, .nm nombres, .vr variables, .cm commentaires */
 .k {
@@ -397,6 +580,20 @@ pre {
 .vr {
   color: var(--v);
   font-weight: 600;
+}
+/* Variable remplacée par la valeur saisie */
+.vv {
+  color: var(--g);
+  font-weight: 600;
+  border-bottom: 1px dashed #35d07f80;
+}
+/* Bloc de texte brut : schéma, exemple de sortie, contexte d'une question */
+pre.raw {
+  background: var(--cb);
+  border: 1px solid #ffffff12;
+  border-radius: 11px;
+  padding: 12px 14px;
+  line-height: 1.5;
 }
 .cm {
   color: var(--cm);
@@ -481,12 +678,22 @@ pre {
   aside.open nav {
     display: flex;
   }
-  nav button {
+  nav a {
     white-space: nowrap;
     padding: 12px 14px; /* grande zone tactile */
   }
-  .grid {
-    columns: 1;
+  aside {
+    height: auto;
+  }
+  /* Référence : les filtres prennent plusieurs lignes, ils défilent avec la page au lieu de rester collés */
+  body[data-view="ref"] .hero {
+    position: static;
+  }
+  details.topo pre {
+    font-size: 11px;
+  }
+  #verline {
+    display: none;
   }
 }
 /* ===== Téléphone : marges resserrées et zones tactiles agrandies ===== */
@@ -513,8 +720,14 @@ pre {
   .bar {
     gap: 6px;
   }
-  #flt button {
+  .fg button,
+  .qcfg button {
     padding: 7px 13px;
+  }
+  /* Étoile : zone tactile plus large */
+  .st {
+    padding: 4px 6px 4px 14px;
+    font-size: 18px;
   }
   /* Cartes : moins de marge interne pour gagner de la largeur */
   .card {
@@ -531,82 +744,31 @@ pre {
   pre {
     font-size: 12.5px;
   }
-  /* Entraînement : boutons sur deux colonnes, plus faciles à viser */
-  .acts button {
-    flex: 1;
-    min-width: calc(50% - 4px);
+  /* Boutons d'action sur toute la largeur, plus faciles à viser */
+  .acts button,
+  .acts .btn {
+    flex: 1 1 100%;
     text-align: center;
   }
 }
-/* ===== Mode entraînement ===== */
-#flt [data-d="easy"] {
-  --led: var(--g);
-}
-#flt [data-d="mid"] {
-  --led: var(--a);
-}
-#flt [data-d="hard"] {
-  --led: var(--r);
-}
-.tcard {
-  max-width: 860px;
-  margin-inline: auto;
-}
-.tr input {
-  flex: 1;
-  min-width: 0;
-  background: #ffffff0d;
-  border: 0;
-  border-bottom: 1px solid #ffffff30;
-  color: #eaf3ff;
-  font: 13px/1.65 var(--f2);
-  padding: 0 8px;
-  margin: 2px 0;
-  border-radius: 4px;
-  outline: 0;
-}
-.tr input:focus {
-  background: #ffffff18;
-  border-color: var(--ac);
-}
-.tr input.ok {
-  border-color: var(--g);
-  color: #aef0cb;
-}
-.tr input.ko {
-  border-color: var(--r);
-  color: #ffb3bb;
-}
-.tr input.sol {
-  color: var(--n);
-}
-.mk {
-  width: 22px;
-  text-align: center;
-  font-weight: 700;
-}
-.tr:has(.ok) .mk {
-  color: var(--g);
-}
-.tr:has(.ko) .mk {
-  color: var(--r);
-}
-.ind {
-  white-space: pre;
-}
+/* ===== Boutons d'action ===== */
 .acts {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
   margin-top: 14px;
 }
-.acts button {
+.acts button,
+.acts .btn {
   padding: 8px 16px;
   border-radius: 10px;
   border: 1px solid var(--bd);
   font-weight: 600;
+  color: var(--tx);
+  text-decoration: none;
 }
-.acts button:hover {
+.acts button:hover,
+.acts .btn:hover {
   border-color: var(--ac);
   color: var(--ac);
 }
@@ -619,18 +781,325 @@ pre {
   color: #fff;
   filter: brightness(1.1);
 }
-.fb {
+.acts button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: none;
+}
+/* ===== Entraînement (QCM) ===== */
+.qcard {
+  max-width: 820px;
+  margin: 22px auto 0;
+  padding: 22px 24px;
+}
+.qcard > p {
+  max-width: 70ch;
+}
+/* Accueil : chiffres clés */
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin: 16px 0;
+}
+.tiles div {
+  background: var(--bg);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.tiles b {
+  display: block;
+  font: 700 26px/1.1 var(--f1);
+  letter-spacing: -0.02em;
+}
+.tiles b small {
+  font: 500 14px var(--f1);
+  color: var(--mu);
+}
+.tiles span {
+  font-size: 13px;
+  color: var(--mu);
+}
+/* Accueil : réglages */
+.qcfg {
+  display: grid;
+  gap: 10px;
+}
+.qcfg > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.qcfg > div > span {
+  width: 86px;
+}
+.qcfg select {
+  padding: 6px 10px;
+  border-radius: 9px;
+  border: 1px solid var(--bd);
+  background: var(--pn);
+  color: var(--tx);
+  font: 500 14px var(--f1);
+  max-width: 100%;
+}
+.qnote {
+  font-size: 13px !important;
+  margin: 10px 0 0 !important;
+}
+/* Progression par thème */
+.prog {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr));
+  gap: 2px 18px;
   margin-top: 10px;
-  min-height: 1.4em;
+}
+.prog > * {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  font-size: 14px;
+  text-align: left;
+}
+.prog > button:hover {
+  background: var(--bg);
+  color: var(--ac);
+}
+.prog span:first-child {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tbar {
+  width: 90px;
+  height: 6px;
+  border-radius: 99px;
+  background: var(--bd);
+  overflow: hidden;
+  flex: none;
+}
+.tbar i {
+  display: block;
+  height: 100%;
+  background: var(--g);
+}
+.prog small {
+  font: 500 11px var(--f2);
+  color: var(--mu);
+  width: 30px;
+  text-align: right;
+}
+/* Question */
+.qtop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.qtop b {
+  font: 700 14px var(--f1);
+  margin-right: 4px;
+}
+.qtop button {
+  margin-left: auto;
+  color: var(--mu);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+.qtop button:hover {
+  color: var(--r);
+}
+.qbar {
+  height: 4px;
+  border-radius: 99px;
+  background: var(--bd);
+  overflow: hidden;
+  margin: 12px 0 18px;
+}
+.qbar i {
+  display: block;
+  height: 100%;
+  background: var(--ac);
+  transition: width 0.25s;
+}
+.qcard p.qq {
+  color: var(--tx);
+  font: 600 17px/1.5 var(--f1);
+  margin: 0 0 12px;
+  max-width: none;
+}
+.qq code,
+.out summary code {
+  font: 500 0.88em var(--f2);
+  background: var(--bg);
+  border: 1px solid var(--bd);
+  border-radius: 6px;
+  padding: 1px 6px;
+}
+.qctx {
+  margin-bottom: 12px;
+}
+.qcard p.qhint {
+  font: 700 11px var(--f1);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin: 0 0 8px;
+}
+/* Réponses proposées */
+.opts {
+  display: grid;
+  gap: 8px;
+}
+.opt {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  padding: 11px 14px;
+  border: 1.5px solid var(--bd);
+  border-radius: 12px;
+  background: var(--pn);
+  color: var(--tx);
+}
+.opt:not(:disabled):not(.static):hover {
+  border-color: var(--ac);
+}
+.opt:disabled {
+  cursor: default;
+}
+.ol {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  background: var(--bg);
+  font: 700 12px var(--f2);
+  color: var(--mu);
+}
+.ob {
+  flex: 1;
+  min-width: 0;
+  padding-top: 1px;
+}
+/* Réponse sous forme de commandes : même rendu que les blocs de code */
+.oc {
+  display: block;
+  background: var(--cb);
+  color: var(--cx);
+  border-radius: 8px;
+  padding: 7px 11px;
+  font: 13px/1.6 var(--f2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.oc > span {
+  display: block;
+}
+.om {
+  flex: none;
+  width: 18px;
+  font-weight: 700;
+  text-align: center;
+}
+.opt.sel {
+  border-color: var(--ac);
+  box-shadow: 0 0 0 2px #0a7fd130;
+}
+.opt.sel .ol {
+  background: var(--ac);
+  color: #fff;
+}
+.opt.good {
+  border-color: var(--g);
+  background: #35d07f14;
+}
+.opt.good .ol {
+  background: var(--g);
+  color: #06281a;
+}
+.opt.good .om {
+  color: var(--g);
+}
+.opt.miss {
+  border-color: var(--g);
+  border-style: dashed;
+}
+.opt.miss .om {
+  color: var(--g);
+}
+.opt.bad {
+  border-color: var(--r);
+  background: #ff5d6c14;
+}
+.opt.bad .ol {
+  background: var(--r);
+  color: #fff;
+}
+.opt.bad .om {
+  color: var(--r);
+}
+/* Explication après validation */
+.why {
+  margin-top: 14px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--bd);
+  background: var(--bg);
+}
+.why.ok {
+  border-color: #35d07f80;
+}
+.why.ko {
+  border-color: #ff5d6c80;
+}
+.why.ok b {
+  color: #1c9a5b;
+}
+.why.ko b {
+  color: var(--r);
+}
+.why p {
+  margin: 4px 0 0;
+  color: var(--tx);
+  font-size: 14.5px;
+  max-width: none;
+}
+.why a {
+  margin-top: 8px;
+}
+.tag.okt {
+  background: #35d07f24;
+  color: #1c9a5b;
+}
+/* Correction en fin de session */
+.corr {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--bd);
+}
+.corr:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+.corr .opt {
+  margin-bottom: 6px;
+}
+.corr > p:not(.qq) {
+  margin: 8px 0 0;
   color: var(--mu);
   font-size: 14px;
+  max-width: none;
 }
-.bh b.sc {
-  font: 600 12px var(--f2);
-  color: var(--n);
-  background: #ffb02022;
-  padding: 2px 10px;
-  border-radius: 99px;
+.corr a {
+  margin-top: 6px;
 }
 /* ===== Onglet Guide : liste des protocoles + fiche détaillée ===== */
 .guide {
@@ -689,8 +1158,95 @@ pre {
   color: var(--mu);
   opacity: 0.55;
 }
-#gsel {
+.gmob {
   display: none;
+}
+.ginfo {
+  margin: 8px 10px 0;
+  font-size: 13px;
+  color: var(--mu);
+}
+/* Schéma, variables, exemples de sortie : blocs repliables */
+details.topo,
+details.vars {
+  margin: 14px 0 4px;
+  border: 1px solid var(--bd);
+  border-radius: 12px;
+  background: var(--bg);
+  padding: 0 14px;
+}
+summary {
+  cursor: pointer;
+  padding: 9px 0;
+  font: 700 13px var(--f1);
+  letter-spacing: 0.02em;
+}
+summary:hover {
+  color: var(--ac);
+}
+summary small {
+  font: 500 12px var(--f2);
+  color: var(--mu);
+  margin-left: 6px;
+}
+details.topo pre {
+  margin-bottom: 14px;
+}
+details.vars p {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--mu);
+  max-width: none;
+}
+.vgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 8px 12px;
+}
+.vgrid label {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.vgrid span {
+  font: 600 11px var(--f2);
+  color: var(--v);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.vgrid input {
+  width: 100%;
+  padding: 6px 9px;
+  border-radius: 8px;
+  border: 1px solid var(--bd);
+  background: var(--pn);
+  color: var(--tx);
+  font: 13px var(--f2);
+}
+details.vars > button {
+  margin: 10px 0 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--mu);
+}
+details.vars > button:hover {
+  color: var(--r);
+}
+details.out {
+  margin-top: 6px;
+  font-size: 13px;
+}
+details.out summary {
+  padding: 4px 0;
+  font-weight: 600;
+  color: var(--mu);
+}
+details.out pre {
+  margin-top: 4px;
+  font-size: 12px;
+}
+details.out p {
+  margin: 6px 0 4px;
 }
 /* Fiche détaillée */
 .gcard {
@@ -882,6 +1438,12 @@ pre {
   .glist {
     display: none;
   }
+  .gmob {
+    display: block;
+  }
+  .gmob .ginfo {
+    margin: 6px 4px 0;
+  }
   #gsel {
     display: block;
     width: 100%;
@@ -920,5 +1482,30 @@ pre {
   .sh h3 {
     flex: 1 1 calc(100% - 40px);
     font-size: 17px;
+  }
+}
+@media (max-width: 480px) {
+  .qcard {
+    margin-top: 6px;
+    padding: 16px 13px;
+  }
+  .qcard p.qq {
+    font-size: 16px;
+  }
+  .tiles b {
+    font-size: 21px;
+  }
+  .qcfg > div > span {
+    width: 100%;
+  }
+  .opt {
+    padding: 10px;
+    gap: 9px;
+  }
+  .vgrid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .rc.x:not(.s) .rcb {
+    columns: 1;
   }
 }

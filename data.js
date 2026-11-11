@@ -2417,5 +2417,815 @@ interface <INTERFACE>
         "Port security avec maximum 1 : violation dès que le téléphone et le PC sont branchés.",
       ],
     },
-  }
+  },
+  {
+    name: "GRE / IPsec",
+    level: "ENCOR",
+    category: "sec",
+    prompt: "R1",
+    description:
+      "Un tunnel GRE relie deux sites comme s'ils étaient branchés par un câble direct, à travers Internet : il transporte le routage dynamique et le multicast. GRE ne chiffre rien : on le protège avec IPsec, qui assure la confidentialité et l'intégrité des paquets.",
+    config: `! Tunnel GRE : interface virtuelle point à point vers l'autre site
+interface tunnel<TUNNEL_ID>
+ ! Adresse du réseau interne au tunnel
+ ip address <TUNNEL_IP> <SUBNET_MASK>
+ ! Extrémités du tunnel : les adresses publiques des deux routeurs
+ tunnel source <INTERFACE>
+ tunnel destination <PEER_PUBLIC_IP>
+ ! Laisse la place aux en-têtes GRE et IPsec pour éviter la fragmentation
+ ip mtu 1400
+ ip tcp adjust-mss 1360
+! IPsec : paramètres de la phase 1 (IKE)
+crypto isakmp policy 10
+ encryption aes 256
+ hash sha256
+ authentication pre-share
+ group 14
+! Clé partagée avec l'autre extrémité
+crypto isakmp key <PRE_SHARED_KEY> address <PEER_PUBLIC_IP>
+! Phase 2 : chiffrement et intégrité des données
+crypto ipsec transform-set <TRANSFORM_SET> esp-aes 256 esp-sha256-hmac
+ mode transport
+crypto ipsec profile <IPSEC_PROFILE>
+ set transform-set <TRANSFORM_SET>
+! Applique IPsec au tunnel
+interface tunnel<TUNNEL_ID>
+ tunnel protection ipsec profile <IPSEC_PROFILE>`,
+    show: `show interfaces tunnel <TUNNEL_ID>
+show ip interface brief
+show crypto isakmp sa
+show crypto ipsec sa`,
+    troubleshoot: `ping <PEER_PUBLIC_IP> source <INTERFACE>
+show ip route <PEER_PUBLIC_IP>
+show crypto session
+show crypto ipsec sa | include encaps|decaps`,
+    debug: `debug tunnel
+debug crypto isakmp
+debug crypto ipsec`,
+    id: "gre",
+    requires: ["interfaces", "static"],
+    guide: {
+      steps: [
+        {
+          title: "Vérifier que les adresses publiques se joignent",
+          level: "req",
+          note: "Le tunnel repose sur le réseau de transport : si les deux adresses publiques ne se joignent pas, rien ne montera. Cette étape se fait en mode privilégié.",
+          config: `do ping <PEER_PUBLIC_IP> source <INTERFACE>`,
+          verify: `show ip route <PEER_PUBLIC_IP>`,
+        },
+        {
+          title: "Créer l'interface tunnel",
+          level: "req",
+          note: "L'adresse IP appartient au réseau interne au tunnel (un /30 suffit). La source et la destination sont les adresses publiques. À faire en miroir sur l'autre routeur.",
+          config: `interface tunnel<TUNNEL_ID>
+ ip address <TUNNEL_IP> <SUBNET_MASK>
+ tunnel source <INTERFACE>
+ tunnel destination <PEER_PUBLIC_IP>`,
+          verify: `show interfaces tunnel <TUNNEL_ID>
+show ip interface brief`,
+        },
+        {
+          title: "Ajuster la MTU",
+          level: "reco",
+          note: "GRE ajoute 24 octets, IPsec davantage. Réduire la MTU et le MSS TCP évite la fragmentation et les sites web qui ne se chargent qu'à moitié.",
+          config: `interface tunnel<TUNNEL_ID>
+ ip mtu 1400
+ ip tcp adjust-mss 1360`,
+        },
+        {
+          title: "Router le trafic dans le tunnel",
+          level: "req",
+          note: "Une route statique vers le réseau distant, ou un protocole de routage activé sur le tunnel. N'annonce jamais le réseau de transport dans ce protocole.",
+          config: `ip route <REMOTE_NETWORK> <SUBNET_MASK> tunnel<TUNNEL_ID>`,
+          verify: `show ip route <REMOTE_NETWORK>`,
+        },
+        {
+          title: "Définir IKE et la clé partagée",
+          level: "reco",
+          section: "Chiffrement IPsec",
+          note: "La politique et la clé doivent être identiques des deux côtés. Chaque routeur indique l'adresse publique de l'autre.",
+          config: `crypto isakmp policy 10
+ encryption aes 256
+ hash sha256
+ authentication pre-share
+ group 14
+crypto isakmp key <PRE_SHARED_KEY> address <PEER_PUBLIC_IP>`,
+          verify: `show crypto isakmp policy`,
+        },
+        {
+          title: "Protéger le tunnel avec un profil IPsec",
+          level: "reco",
+          note: "Le mode transport suffit, puisque GRE encapsule déjà le paquet d'origine. Le profil s'applique directement sur l'interface tunnel, sans ACL de trafic intéressant.",
+          config: `crypto ipsec transform-set <TRANSFORM_SET> esp-aes 256 esp-sha256-hmac
+ mode transport
+crypto ipsec profile <IPSEC_PROFILE>
+ set transform-set <TRANSFORM_SET>
+interface tunnel<TUNNEL_ID>
+ tunnel protection ipsec profile <IPSEC_PROFILE>`,
+          verify: `show crypto isakmp sa
+show crypto ipsec sa`,
+        },
+      ],
+      pitfalls: [
+        "Routage récursif : la route vers la destination du tunnel est apprise par le tunnel, qui monte et tombe en boucle (%TUN-5-RECURDOWN).",
+        "tunnel destination pointant sur l'adresse interne du tunnel au lieu de l'adresse publique de l'autre routeur.",
+        "Tunnel up/up alors que l'autre côté est injoignable : sans keepalive ni IPsec, un tunnel GRE reste up tant que la route vers la destination existe.",
+        "Politique IKE ou clé partagée différente entre les deux routeurs : la phase 1 ne monte pas (état MM_NO_STATE).",
+        "MTU non ajustée : les petits paquets passent (ping), les gros sont fragmentés ou perdus.",
+      ],
+    },
+  },
+  {
+    name: "QoS (MQC)",
+    level: "ENCOR",
+    category: "svc",
+    prompt: "R1",
+    description:
+      "La qualité de service décide quel trafic passe en premier quand un lien est saturé. Avec la méthode MQC, on classe le trafic (class-map), on décide quoi en faire (policy-map), puis on applique la politique à une interface (service-policy). La voix et la vidéo y gagnent en délai et en stabilité.",
+    config: `! 1. Classer : quel trafic appartient à quelle classe
+class-map match-any <CLASS_NAME>
+ match dscp ef
+ match protocol rtp
+! 2. Décider : traitement de chaque classe
+policy-map <POLICY_NAME>
+ class <CLASS_NAME>
+  ! File prioritaire (LLQ), limitée à un pourcentage du lien
+  priority percent <PERCENT>
+ class class-default
+  ! Le reste se partage la bande passante équitablement
+  fair-queue
+! 3. Appliquer en sortie de l'interface saturée
+interface <INTERFACE>
+ service-policy output <POLICY_NAME>`,
+    show: `show class-map
+show policy-map
+show policy-map interface <INTERFACE>`,
+    troubleshoot: `show policy-map interface <INTERFACE> output
+show interfaces <INTERFACE> | include drops|rate
+show running-config | section policy-map`,
+    debug: ``,
+    id: "qos",
+    requires: ["interfaces", "acl"],
+    guide: {
+      steps: [
+        {
+          title: "Classer le trafic",
+          level: "req",
+          note: "match-any : une seule condition suffit. match-all : toutes doivent être vraies. On peut classer sur le marquage DSCP, une ACL ou un protocole reconnu.",
+          config: `class-map match-any <CLASS_NAME>
+ match dscp ef
+ match access-group <ACL_NUMBER>`,
+          verify: `show class-map`,
+        },
+        {
+          title: "Marquer le trafic à l'entrée du réseau",
+          level: "reco",
+          note: "On marque au plus près de la source, une seule fois. Les équipements suivants n'ont plus qu'à lire le champ DSCP. EF (46) pour la voix, AF41 pour la vidéo, CS3 pour la signalisation.",
+          config: `policy-map <MARKING_POLICY>
+ class <CLASS_NAME>
+  set dscp ef
+interface <LAN_INTERFACE>
+ service-policy input <MARKING_POLICY>`,
+          verify: `show policy-map interface <LAN_INTERFACE>`,
+        },
+        {
+          title: "Définir les files d'attente",
+          level: "req",
+          note: "priority crée une file à priorité stricte (LLQ) pour la voix. bandwidth garantit un minimum aux autres classes sans leur donner la priorité.",
+          config: `policy-map <POLICY_NAME>
+ class <CLASS_NAME>
+  priority percent <PERCENT>
+ class <DATA_CLASS>
+  bandwidth percent <DATA_PERCENT>
+ class class-default
+  fair-queue`,
+          verify: `show policy-map <POLICY_NAME>`,
+        },
+        {
+          title: "Appliquer la politique en sortie",
+          level: "req",
+          note: "Les files d'attente ne fonctionnent qu'en sortie, sur l'interface où se produit la congestion.",
+          config: `interface <INTERFACE>
+ service-policy output <POLICY_NAME>`,
+          verify: `show policy-map interface <INTERFACE>`,
+        },
+        {
+          title: "Lisser le débit (shaping)",
+          level: "opt",
+          note: "Quand l'opérateur limite le débit en dessous de la vitesse du port, le shaping retient le trafic en excès au lieu de le laisser jeter. La politique de files s'imbrique dans le shaper.",
+          config: `policy-map <SHAPER_NAME>
+ class class-default
+  shape average <RATE_BPS>
+  service-policy <POLICY_NAME>
+interface <INTERFACE>
+ service-policy output <SHAPER_NAME>`,
+          verify: `show policy-map interface <INTERFACE>`,
+        },
+        {
+          title: "Limiter un trafic (policing)",
+          level: "opt",
+          note: "Le policing jette ou re-marque immédiatement ce qui dépasse le débit autorisé. Il s'applique en entrée comme en sortie.",
+          config: `policy-map <POLICER_NAME>
+ class <CLASS_NAME>
+  police <RATE_BPS> conform-action transmit exceed-action drop
+interface <INTERFACE>
+ service-policy input <POLICER_NAME>`,
+          verify: `show policy-map interface <INTERFACE>`,
+        },
+      ],
+      pitfalls: [
+        "Politique de files d'attente appliquée en entrée : IOS la refuse, les files n'existent qu'en sortie.",
+        "Confondre priority (priorité stricte, avec limite) et bandwidth (minimum garanti, sans priorité).",
+        "Trop de trafic dans la file prioritaire : ce qui dépasse la limite est jeté en cas de congestion.",
+        "Marquage non conservé : un équipement intermédiaire qui ne fait pas confiance au DSCP le remet à 0.",
+        "Compteurs à zéro dans show policy-map interface : le trafic ne correspond à aucune class-map.",
+      ],
+    },
+  },
+  {
+    name: "Multicast / PIM",
+    level: "ENCOR",
+    category: "",
+    prompt: "R1",
+    description:
+      "Le multicast envoie un même flux à un groupe de récepteurs intéressés, sans inonder tout le réseau comme un broadcast. Les hôtes s'abonnent à un groupe avec IGMP, et les routeurs construisent l'arbre de diffusion avec PIM. En sparse mode, ils se retrouvent autour d'un point de rendez-vous (RP).",
+    config: `! Active le routage multicast (désactivé par défaut)
+ip multicast-routing
+! Adresse du point de rendez-vous, identique sur tous les routeurs
+ip pim rp-address <RP_ADDRESS>
+interface <INTERFACE>
+ ! PIM sparse mode sur chaque interface du chemin, y compris vers les hôtes
+ ip pim sparse-mode
+! Version d'IGMP côté hôtes (2 par défaut, 3 pour SSM)
+interface <LAN_INTERFACE>
+ ip igmp version 3`,
+    show: `show ip mroute
+show ip pim neighbor
+show ip pim interface
+show ip pim rp mapping
+show ip igmp groups
+show ip igmp interface <LAN_INTERFACE>`,
+    troubleshoot: `show ip rpf <SOURCE_IP>
+show ip mroute <GROUP_ADDRESS>
+show ip mroute count
+mtrace <SOURCE_IP> <GROUP_ADDRESS>`,
+    debug: `debug ip pim
+debug ip igmp`,
+    id: "multicast",
+    requires: ["interfaces", "ospf"],
+    guide: {
+      steps: [
+        {
+          title: "Activer le routage multicast",
+          level: "req",
+          note: "Sans cette commande, le routeur ignore le trafic multicast. Sur certains switchs de niveau 3, la commande est ip multicast-routing distributed.",
+          config: `ip multicast-routing`,
+          verify: `show ip multicast`,
+        },
+        {
+          title: "Activer PIM sur les interfaces",
+          level: "req",
+          note: "Sur toutes les interfaces du chemin : entre routeurs, vers la source et vers les récepteurs. PIM active aussi IGMP sur l'interface.",
+          config: `interface <INTERFACE>
+ ip pim sparse-mode`,
+          verify: `show ip pim interface
+show ip pim neighbor`,
+        },
+        {
+          title: "Déclarer le point de rendez-vous",
+          level: "req",
+          note: "La même adresse sur tous les routeurs, y compris sur le RP lui-même. On prend en général une loopback, annoncée dans l'IGP.",
+          config: `ip pim rp-address <RP_ADDRESS>`,
+          verify: `show ip pim rp mapping`,
+        },
+        {
+          title: "Vérifier l'abonnement des hôtes",
+          level: "reco",
+          note: "Pour tester sans récepteur réel, une interface du routeur peut s'abonner elle-même au groupe : elle répondra aux pings multicast.",
+          config: `interface <LAN_INTERFACE>
+ ip igmp join-group <GROUP_ADDRESS>`,
+          verify: `show ip igmp groups
+show ip mroute <GROUP_ADDRESS>`,
+        },
+        {
+          title: "Élire le RP automatiquement (BSR)",
+          level: "opt",
+          note: "Évite de configurer l'adresse du RP à la main partout : un routeur se porte candidat RP, un autre diffuse l'information.",
+          config: `ip pim bsr-candidate loopback0
+ip pim rp-candidate loopback0`,
+          verify: `show ip pim bsr-router
+show ip pim rp mapping`,
+        },
+      ],
+      pitfalls: [
+        "Échec RPF : le flux arrive par une interface qui n'est pas celle que la table de routage unicast utilise pour joindre la source. Il est jeté.",
+        "PIM oublié sur une interface du chemin : l'arbre est coupé à cet endroit.",
+        "Adresse de RP différente ou absente sur un routeur : les récepteurs derrière lui ne reçoivent rien.",
+        "RP injoignable en unicast : son adresse doit être annoncée dans l'IGP.",
+        "TTL à 1 côté source : le flux ne dépasse pas le premier routeur.",
+      ],
+    },
+  },
+  {
+    name: "Wireless (WLC 9800)",
+    level: "ENCOR",
+    category: "",
+    prompt: "WLC",
+    description:
+      "Dans un réseau Wi-Fi d'entreprise, les bornes sont pilotées par un contrôleur (WLC) à travers un tunnel CAPWAP. Sur un Catalyst 9800, un SSID se construit en trois briques : le WLAN (nom et sécurité), le profil de politique (VLAN des clients) et le tag qui relie les deux et qu'on attribue aux bornes.",
+    config: `! 1. Le WLAN : nom du profil, identifiant et SSID diffusé
+wlan <WLAN_NAME> <WLAN_ID> <SSID>
+ ! WPA2 avec clé partagée (remplace 802.1X, activé par défaut)
+ no security wpa akm dot1x
+ security wpa akm psk
+ security wpa psk set-key ascii 0 <PRE_SHARED_KEY>
+ no shutdown
+! 2. Le profil de politique : VLAN dans lequel arrivent les clients
+wireless profile policy <POLICY_NAME>
+ vlan <VLAN_ID>
+ no shutdown
+! 3. Le tag : associe le WLAN au profil de politique
+wireless tag policy <TAG_NAME>
+ wlan <WLAN_NAME> policy <POLICY_NAME>
+! 4. Attribue le tag à une borne (adresse MAC Ethernet de la borne)
+ap <AP_MAC>
+ policy-tag <TAG_NAME>`,
+    show: `show wlan summary
+show ap summary
+show ap tag summary
+show wireless client summary
+show wireless profile policy summary
+show wireless tag policy summary`,
+    troubleshoot: `show wireless client mac-address <CLIENT_MAC> detail
+show ap name <AP_NAME> config general
+show wireless stats client delete reasons
+show ap join stats summary`,
+    debug: ``,
+    id: "wireless",
+    requires: ["vlan", "trunk", "dhcp"],
+    guide: {
+      steps: [
+        {
+          title: "Préparer le VLAN des clients",
+          level: "req",
+          note: "Le VLAN doit exister sur le contrôleur et passer sur le trunk qui le relie au réseau. Les clients y recevront leur adresse par DHCP.",
+          config: `vlan <VLAN_ID>
+ name <VLAN_NAME>
+interface <UPLINK_INTERFACE>
+ switchport mode trunk
+ switchport trunk allowed vlan add <VLAN_ID>`,
+          verify: `show vlan brief
+show interfaces trunk`,
+        },
+        {
+          title: "Créer le WLAN",
+          level: "req",
+          note: "Le nom du profil et le SSID peuvent être différents. Un WLAN est créé désactivé, et en WPA2 802.1X par défaut : on bascule ici sur une clé partagée.",
+          config: `wlan <WLAN_NAME> <WLAN_ID> <SSID>
+ no security wpa akm dot1x
+ security wpa akm psk
+ security wpa psk set-key ascii 0 <PRE_SHARED_KEY>
+ no shutdown`,
+          verify: `show wlan summary`,
+        },
+        {
+          title: "Créer le profil de politique",
+          level: "req",
+          note: "Il indique dans quel VLAN placer les clients. Lui aussi est créé désactivé.",
+          config: `wireless profile policy <POLICY_NAME>
+ vlan <VLAN_ID>
+ no shutdown`,
+          verify: `show wireless profile policy summary`,
+        },
+        {
+          title: "Relier WLAN et politique dans un tag",
+          level: "req",
+          note: "Sans tag, le WLAN n'est diffusé par aucune borne.",
+          config: `wireless tag policy <TAG_NAME>
+ wlan <WLAN_NAME> policy <POLICY_NAME>`,
+          verify: `show wireless tag policy summary`,
+        },
+        {
+          title: "Attribuer le tag aux bornes",
+          level: "req",
+          note: "La borne redémarre sa connexion CAPWAP en changeant de tag : attends-toi à une courte coupure.",
+          config: `ap <AP_MAC>
+ policy-tag <TAG_NAME>`,
+          verify: `show ap tag summary
+show ap summary`,
+        },
+        {
+          title: "Vérifier la connexion d'un client",
+          level: "reco",
+          note: "L'état Run indique un client authentifié qui a obtenu son adresse IP. Cette étape se fait en mode privilégié.",
+          config: `do show wireless client summary`,
+          verify: `show wireless client mac-address <CLIENT_MAC> detail`,
+        },
+      ],
+      pitfalls: [
+        "WLAN ou profil de politique laissé en shutdown : le SSID n'apparaît pas.",
+        "Tag créé mais attribué à aucune borne : elles gardent le tag par défaut et ne diffusent pas le SSID.",
+        "VLAN des clients absent du trunk du contrôleur : les clients s'associent mais n'obtiennent pas d'adresse IP.",
+        "Borne qui ne rejoint pas le contrôleur : vérifie l'option DHCP 43 ou l'entrée DNS CISCO-CAPWAP-CONTROLLER, et les ports UDP 5246 et 5247.",
+        "Heure fausse sur le contrôleur : les certificats des bornes sont refusés.",
+      ],
+    },
+  },
+  {
+    name: "SD-WAN (WAN Edge)",
+    level: "ENCOR",
+    category: "",
+    prompt: "Edge1",
+    description:
+      "Cisco SD-WAN sépare les rôles : vManage administre, vBond met en relation et authentifie, vSmart distribue les routes et les politiques (protocole OMP), et les routeurs WAN Edge transportent les données dans des tunnels IPsec. En production, la configuration vient des modèles de vManage : le CLI sert surtout au premier démarrage et au diagnostic.",
+    config: `! Sur un routeur IOS-XE SD-WAN, on configure en transaction, validée par commit
+config-transaction
+! Identité du routeur dans la fabrique
+system
+ system-ip <SYSTEM_IP>
+ site-id <SITE_ID>
+ organization-name <ORG_NAME>
+ vbond <VBOND_ADDRESS>
+! Interface de transport et son tunnel
+interface Tunnel1
+ ip unnumbered <WAN_INTERFACE>
+ tunnel source <WAN_INTERFACE>
+ tunnel mode sdwan
+sdwan
+ interface <WAN_INTERFACE>
+  tunnel-interface
+   encapsulation ipsec
+   color <COLOR>
+commit`,
+    show: `show sdwan control connections
+show sdwan control local-properties
+show sdwan bfd sessions
+show sdwan omp peers
+show sdwan omp routes
+show sdwan running-config`,
+    troubleshoot: `show sdwan control connection-history
+show sdwan certificate serial
+show sdwan tunnel statistics
+ping <VBOND_ADDRESS>`,
+    debug: ``,
+    id: "sdwan",
+    requires: ["interfaces", "static"],
+    guide: {
+      steps: [
+        {
+          title: "Joindre le vBond",
+          level: "req",
+          note: "Le routeur doit avoir une adresse sur son interface de transport, une route par défaut et savoir joindre le vBond. Cette étape se fait en mode privilégié.",
+          config: `do ping <VBOND_ADDRESS>`,
+          verify: `show ip route 0.0.0.0`,
+        },
+        {
+          title: "Donner son identité au routeur",
+          level: "req",
+          note: "system-ip est un identifiant unique, pas une adresse d'interface. Le nom d'organisation doit correspondre exactement à celui des contrôleurs, majuscules comprises.",
+          config: `config-transaction
+system
+ system-ip <SYSTEM_IP>
+ site-id <SITE_ID>
+ organization-name <ORG_NAME>
+ vbond <VBOND_ADDRESS>
+commit`,
+          verify: `show sdwan control local-properties`,
+        },
+        {
+          title: "Déclarer l'interface de transport",
+          level: "req",
+          note: "La couleur identifie le type de lien (biz-internet, mpls, lte…). Elle sert ensuite aux politiques de choix de chemin.",
+          config: `config-transaction
+interface Tunnel1
+ ip unnumbered <WAN_INTERFACE>
+ tunnel source <WAN_INTERFACE>
+ tunnel mode sdwan
+sdwan
+ interface <WAN_INTERFACE>
+  tunnel-interface
+   encapsulation ipsec
+   color <COLOR>
+commit`,
+          verify: `show sdwan control connections`,
+        },
+        {
+          title: "Vérifier le plan de contrôle",
+          level: "req",
+          note: "Les connexions vers vSmart et vManage doivent être à l'état up. Tant que ce n'est pas le cas, aucune route ni politique n'arrive. Cette étape se fait en mode privilégié.",
+          config: `do show sdwan control connections`,
+          verify: `show sdwan omp peers
+show sdwan control connection-history`,
+        },
+        {
+          title: "Vérifier le plan de données",
+          level: "reco",
+          note: "Chaque tunnel vers un autre site est surveillé par une session BFD. Les routes des autres sites arrivent par OMP. Cette étape se fait en mode privilégié.",
+          config: `do show sdwan bfd sessions`,
+          verify: `show sdwan omp routes`,
+        },
+      ],
+      pitfalls: [
+        "Nom d'organisation différent de celui des contrôleurs : l'authentification échoue.",
+        "Numéro de série du routeur absent de la liste autorisée dans vManage, ou certificat non installé.",
+        "Heure fausse : les certificats sont jugés invalides. Synchronise l'horloge avant tout.",
+        "Pare-feu ou NAT qui bloque UDP 12346 (DTLS) entre le routeur et les contrôleurs.",
+        "Oublier commit : la transaction n'est jamais appliquée.",
+      ],
+    },
+  },
+  {
+    name: "NETCONF / RESTCONF / EEM",
+    level: "ENCOR",
+    category: "svc",
+    prompt: "R1",
+    description:
+      "L'automatisation remplace la saisie manuelle par des programmes. NETCONF (sur SSH) et RESTCONF (sur HTTPS) exposent la configuration sous forme de données structurées, décrites par des modèles YANG. EEM, lui, exécute des actions directement sur l'équipement quand un événement se produit.",
+    config: `! Compte de niveau 15 utilisé par les API
+username <USERNAME> privilege 15 secret <PASSWORD>
+! NETCONF : SSH sur le port 830, données en XML
+netconf-yang
+! RESTCONF : HTTPS, données en JSON ou XML
+ip http secure-server
+ip http authentication local
+restconf
+! EEM : exécute des commandes quand un message syslog apparaît
+event manager applet <APPLET_NAME>
+ event syslog pattern "<PATTERN>"
+ action 1.0 cli command "enable"
+ action 2.0 cli command "<COMMAND>"
+ action 3.0 syslog msg "<MESSAGE>"`,
+    show: `show netconf-yang sessions
+show netconf-yang datastores
+show platform software yang-management process
+show ip http server status
+show event manager policy registered
+show event manager history events`,
+    troubleshoot: `show netconf-yang statistics
+show ip http server secure status
+show event manager statistics policy
+show logging | include HA_EM`,
+    debug: `debug event manager action cli`,
+    id: "auto",
+    requires: ["basic", "ssh"],
+    guide: {
+      steps: [
+        {
+          title: "Créer un compte pour les API",
+          level: "req",
+          note: "NETCONF et RESTCONF exigent un compte de niveau de privilège 15.",
+          config: `username <USERNAME> privilege 15 secret <PASSWORD>`,
+          verify: `show running-config | include username`,
+        },
+        {
+          title: "Activer NETCONF",
+          level: "req",
+          section: "API",
+          note: "Le service écoute en SSH sur le port 830. Test depuis un poste : ssh -p 830 <USERNAME>@<IP_ADDRESS> -s netconf. Le routeur répond par la liste de ses capacités.",
+          config: `netconf-yang`,
+          verify: `show platform software yang-management process
+show netconf-yang sessions`,
+        },
+        {
+          title: "Activer RESTCONF",
+          level: "reco",
+          note: "RESTCONF passe par le serveur HTTPS de l'équipement. Les verbes HTTP correspondent aux opérations : GET lit, POST crée, PUT remplace, PATCH modifie, DELETE supprime. Point d'entrée : https://<IP_ADDRESS>/restconf/data/",
+          config: `ip http secure-server
+ip http authentication local
+restconf`,
+          verify: `show ip http server secure status
+show platform software yang-management process`,
+        },
+        {
+          title: "Réagir à un événement avec EEM",
+          level: "opt",
+          section: "Automatisation embarquée",
+          note: "Les commandes de l'applet partent du mode utilisateur : commence par enable, puis configure terminal si tu modifies la configuration.",
+          config: `event manager applet <APPLET_NAME>
+ event syslog pattern "<PATTERN>"
+ action 1.0 cli command "enable"
+ action 2.0 cli command "<COMMAND>"
+ action 3.0 syslog msg "<MESSAGE>"`,
+          verify: `show event manager policy registered
+show event manager history events`,
+        },
+        {
+          title: "Lancer un applet à la main",
+          level: "opt",
+          note: "event none crée un applet sans déclencheur, lancé avec event manager run. Pratique pour tester une suite d'actions.",
+          config: `event manager applet <APPLET_NAME>
+ event none
+ action 1.0 cli command "enable"
+ action 2.0 cli command "<COMMAND>"
+do event manager run <APPLET_NAME>`,
+          verify: `show event manager history events`,
+        },
+      ],
+      pitfalls: [
+        "Compte sans privilege 15 : la session NETCONF ou RESTCONF est refusée.",
+        "RESTCONF sans ip http secure-server : le service ne répond pas.",
+        "Port 830 ou 443 filtré par une ACL ou un pare-feu entre le poste et l'équipement.",
+        "Applet EEM sans enable en première action : les commandes suivantes échouent.",
+        "Motif syslog trop large : l'applet se déclenche en boucle, parfois sur ses propres messages.",
+      ],
+    },
+  },
+  {
+    name: "IP SLA / Tracking",
+    level: "ENCOR",
+    category: "svc",
+    prompt: "R1",
+    description:
+      "IP SLA envoie des sondes (ping, connexion TCP, requête HTTP…) pour mesurer en continu si une destination répond, et en combien de temps. Associé à un objet de suivi (track), il permet de retirer une route ou de faire basculer HSRP quand un lien fonctionne mal, même si l'interface reste up.",
+    config: `! Sonde : ping vers une cible, toutes les 10 secondes
+ip sla <SLA_ID>
+ icmp-echo <TARGET_IP> source-interface <INTERFACE>
+ frequency 10
+! Démarre la sonde, sans date de fin
+ip sla schedule <SLA_ID> life forever start-time now
+! Objet de suivi : up tant que la sonde réussit
+track <TRACK_ID> ip sla <SLA_ID> reachability
+! Route conservée seulement si l'objet est up
+ip route 0.0.0.0 0.0.0.0 <NEXT_HOP> track <TRACK_ID>
+! Route de secours (distance administrative plus haute)
+ip route 0.0.0.0 0.0.0.0 <BACKUP_NEXT_HOP> 10`,
+    show: `show ip sla summary
+show ip sla statistics
+show ip sla configuration
+show track
+show track brief
+show ip route static`,
+    troubleshoot: `show ip sla statistics <SLA_ID>
+show track <TRACK_ID>
+show ip route 0.0.0.0
+ping <TARGET_IP> source <INTERFACE>`,
+    debug: `debug track
+debug ip sla error`,
+    id: "ipsla",
+    requires: ["interfaces", "static"],
+    guide: {
+      steps: [
+        {
+          title: "Créer la sonde",
+          level: "req",
+          note: "Choisis une cible stable, située au-delà du lien à surveiller. Préciser l'interface source force la sonde à emprunter ce lien.",
+          config: `ip sla <SLA_ID>
+ icmp-echo <TARGET_IP> source-interface <INTERFACE>
+ frequency 10`,
+          verify: `show ip sla configuration`,
+        },
+        {
+          title: "Démarrer la sonde",
+          level: "req",
+          note: "Une sonde configurée ne fait rien tant qu'elle n'est pas planifiée. Une fois lancée, elle ne peut plus être modifiée : il faut la supprimer et la recréer.",
+          config: `ip sla schedule <SLA_ID> life forever start-time now`,
+          verify: `show ip sla summary
+show ip sla statistics`,
+        },
+        {
+          title: "Créer l'objet de suivi",
+          level: "req",
+          note: "L'objet passe down quand la sonde échoue. Le délai évite de basculer à la moindre perte isolée.",
+          config: `track <TRACK_ID> ip sla <SLA_ID> reachability
+ delay down 10 up 30`,
+          verify: `show track`,
+        },
+        {
+          title: "Lier la route principale au suivi",
+          level: "req",
+          note: "La route est retirée de la table quand l'objet est down. La route de secours, de distance administrative plus haute, prend alors le relais.",
+          config: `ip route 0.0.0.0 0.0.0.0 <NEXT_HOP> track <TRACK_ID>
+ip route 0.0.0.0 0.0.0.0 <BACKUP_NEXT_HOP> 10`,
+          verify: `show ip route static
+show ip route 0.0.0.0`,
+        },
+        {
+          title: "Faire basculer HSRP sur le même suivi",
+          level: "opt",
+          note: "Le routeur actif baisse sa priorité quand son lien montant ne fonctionne plus, et laisse la main à l'autre (qui doit avoir preempt).",
+          config: `interface <LAN_INTERFACE>
+ standby <GROUP> track <TRACK_ID> decrement 20`,
+          verify: `show standby brief`,
+        },
+      ],
+      pitfalls: [
+        "Sonde jamais planifiée (ip sla schedule oublié) : l'objet de suivi reste down et la route n'est jamais installée.",
+        "Cible de la sonde joignable aussi par le lien de secours : la sonde réussit toujours. Fixe l'interface source ou ajoute une route d'hôte vers la cible.",
+        "Route de secours sans distance administrative plus haute : les deux routes sont utilisées en même temps.",
+        "Surveiller l'adresse du prochain saut seulement : une panne plus loin chez l'opérateur passe inaperçue.",
+      ],
+    },
+  },
+  {
+    name: "SPAN / NetFlow",
+    level: "ENCOR",
+    category: "svc",
+    prompt: "SW1",
+    description:
+      "Deux façons d'observer le trafic. SPAN recopie les trames d'un port ou d'un VLAN vers un analyseur (Wireshark, sonde IDS) : on voit tout le contenu. NetFlow ne garde que des statistiques par flux (qui parle à qui, combien d'octets) et les exporte vers un collecteur : idéal pour savoir ce qui consomme la bande passante.",
+    config: `! SPAN local : copie le trafic d'un port vers l'analyseur
+monitor session <SESSION_ID> source interface <SOURCE_INTERFACE> both
+monitor session <SESSION_ID> destination interface <DEST_INTERFACE>
+! Flexible NetFlow : ce qu'on mesure
+flow record <RECORD_NAME>
+ match ipv4 source address
+ match ipv4 destination address
+ match ipv4 protocol
+ collect counter bytes
+ collect counter packets
+! Vers quel collecteur exporter
+flow exporter <EXPORTER_NAME>
+ destination <COLLECTOR_IP>
+ transport udp 2055
+! Le moniteur relie l'enregistrement et l'exportateur
+flow monitor <MONITOR_NAME>
+ record <RECORD_NAME>
+ exporter <EXPORTER_NAME>
+! Active la mesure sur une interface
+interface <INTERFACE>
+ ip flow monitor <MONITOR_NAME> input`,
+    show: `show monitor session all
+show flow monitor <MONITOR_NAME> cache
+show flow exporter statistics
+show flow interface <INTERFACE>
+show flow record`,
+    troubleshoot: `show monitor session <SESSION_ID> detail
+show flow monitor <MONITOR_NAME> statistics
+show flow exporter <EXPORTER_NAME>
+ping <COLLECTOR_IP>`,
+    debug: ``,
+    id: "span",
+    requires: ["interfaces", "vlan"],
+    guide: {
+      steps: [
+        {
+          title: "SPAN local",
+          level: "req",
+          section: "Copier le trafic (SPAN)",
+          note: "Source et destination sont sur le même switch. both copie les deux sens, rx seulement le trafic reçu, tx seulement le trafic émis. Le port de destination ne sert plus qu'à l'analyseur.",
+          config: `monitor session <SESSION_ID> source interface <SOURCE_INTERFACE> both
+monitor session <SESSION_ID> destination interface <DEST_INTERFACE>`,
+          verify: `show monitor session all`,
+        },
+        {
+          title: "RSPAN : switch source",
+          level: "opt",
+          note: "Quand l'analyseur est sur un autre switch, la copie voyage dans un VLAN dédié, à créer sur tous les switchs du chemin et à autoriser sur les trunks.",
+          config: `vlan <RSPAN_VLAN>
+ remote-span
+monitor session <SESSION_ID> source interface <SOURCE_INTERFACE> both
+monitor session <SESSION_ID> destination remote vlan <RSPAN_VLAN>`,
+          verify: `show monitor session all
+show vlan remote-span`,
+        },
+        {
+          title: "RSPAN : switch de l'analyseur",
+          level: "opt",
+          prompt: "SW2",
+          note: "Le switch distant prend le VLAN RSPAN comme source et le recopie vers le port de l'analyseur.",
+          config: `vlan <RSPAN_VLAN>
+ remote-span
+monitor session <SESSION_ID> source remote vlan <RSPAN_VLAN>
+monitor session <SESSION_ID> destination interface <DEST_INTERFACE>`,
+          verify: `show monitor session all`,
+        },
+        {
+          title: "Définir l'enregistrement et l'exportateur",
+          level: "req",
+          section: "Mesurer les flux (Flexible NetFlow)",
+          note: "match définit ce qui distingue deux flux, collect ce qu'on compte pour chacun. L'exportateur désigne le collecteur et son port UDP.",
+          config: `flow record <RECORD_NAME>
+ match ipv4 source address
+ match ipv4 destination address
+ match ipv4 protocol
+ collect counter bytes
+ collect counter packets
+flow exporter <EXPORTER_NAME>
+ destination <COLLECTOR_IP>
+ transport udp 2055`,
+          verify: `show flow record
+show flow exporter <EXPORTER_NAME>`,
+        },
+        {
+          title: "Créer le moniteur et l'appliquer",
+          level: "req",
+          note: "Le moniteur s'applique par interface et par sens. Le cache se consulte directement sur l'équipement, même sans collecteur.",
+          config: `flow monitor <MONITOR_NAME>
+ record <RECORD_NAME>
+ exporter <EXPORTER_NAME>
+interface <INTERFACE>
+ ip flow monitor <MONITOR_NAME> input`,
+          verify: `show flow monitor <MONITOR_NAME> cache
+show flow exporter statistics`,
+        },
+      ],
+      pitfalls: [
+        "Source et destination dans deux sessions de numéros différents : rien n'est copié.",
+        "Port de destination SPAN utilisé pour autre chose : il ne transmet plus le trafic normal.",
+        "VLAN RSPAN absent d'un switch du chemin ou non autorisé sur un trunk : la copie n'arrive pas.",
+        "Port source beaucoup plus chargé que le port de destination : une partie de la copie est perdue.",
+        "Moniteur NetFlow créé mais appliqué à aucune interface : le cache reste vide.",
+      ],
+    },
+  },
 ];
