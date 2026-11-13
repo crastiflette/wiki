@@ -598,7 +598,7 @@ function qhome() {
   $("#out").innerHTML = `
     <div class="card qcard">
       <h2>Entraînement</h2>
-      <p>${Q.length} questions à choix unique ou multiple, réparties en ${QLV.length} catégories : ${QLV.map(([, l]) => l).join(", ")}. ${Math.round((100 * Q.filter((q) => q.k == "sit").length) / Q.length)} % sont des mises en situation : un besoin ou une panne, et les commandes à choisir. Les réponses CCNA et CCNP ENCOR sont expliquées.</p>
+      <p>${Q.length} questions à choix unique ou multiple, réparties en ${QLV.length} catégories : ${QLV.map(([, l]) => l).join(", ")}. ${Math.round((100 * Q.filter((q) => q.k == "sit").length) / Q.length)} % sont des mises en situation : un besoin ou une panne, et les commandes à choisir. Chaque réponse est expliquée.</p>
       <div class="tiles">
         <div><b>${seen.length}<small> / ${Q.length}</small></b><span>questions vues</span></div>
         <div><b>${tries ? Math.round((100 * oks) / tries) + " %" : "–"}</b><span>de réussite</span></div>
