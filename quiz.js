@@ -2,17 +2,26 @@
  * QUESTIONS DU MODE ENTRAÎNEMENT (QCM). Pour en ajouter une, copie un bloc.
  *   id   : identifiant unique (sert à mémoriser tes réussites / erreurs dans le navigateur)
  *   t    : thème = id d'une fiche de data.js (lien « Revoir la fiche ») ou une clé de QT ci-dessous
- *   lv   : "CCNA" ou "ENCOR"
+ *   lv   : catégorie : "CCNA", "ENCOR" ou "CSNE" (une nouvelle valeur crée une nouvelle catégorie)
  *   k    : "sit" (mise en situation) ou "th" (théorie)
  *   q    : l'énoncé. Le texte entre `accents graves` est affiché comme du code.
  *   ctx  : (facultatif) configuration, sortie de commande ou schéma affiché sous l'énoncé
  *   cmd  : true si les réponses sont des commandes (affichées comme du code, une commande par ligne)
  *   o    : les réponses proposées (mélangées à l'affichage)
  *   a    : positions des bonnes réponses dans o (0 = la première). Plusieurs positions = choix multiple.
- *   why  : l'explication affichée après validation
+ *   why  : (facultatif) l'explication affichée après validation
+ *   fix  : (facultatif) true pour ne pas mélanger les réponses (Vrai / Faux)
  */
 // Thèmes qui ne correspondent à aucune fiche.
-const QT = { subnet: "Adressage IP", routing: "Table de routage" };
+const QT = {
+  subnet: "Adressage IP",
+  routing: "Table de routage",
+  "csne-ips": "Prévention d'intrusion",
+  "csne-pki": "Infrastructure à clés publiques",
+  "csne-ssl": "Proxy SSL",
+};
+// Réponses des questions Vrai / Faux.
+const VF = ["Vrai", "Faux"];
 
 const Q = [
   // ======================= CCNA : commutation =======================
@@ -1021,5 +1030,210 @@ Chemin B : local preference 100, AS-path de 1 AS`,
     ],
     a: [0],
     why: "Un applet se déclenche sur un événement, ici un message syslog. Ses commandes CLI partent du mode utilisateur : il faut passer par enable puis configure terminal avant de modifier l'interface.",
+  },
+  // ======================= CSNE : Prévention d'intrusion (p. 101-103) =======================
+  {
+    id: "csne-ips-q1",
+    t: "csne-ips",
+    lv: "CSNE",
+    k: "th",
+    q: "La mise en quarantaine dynamique d’une machine ayant déclenché une alarme :",
+    o: [
+      "Interdira tout trafic IP vers cette machine",
+      "Interdira tout trafic IP depuis cette machine",
+      "Peut être débrayée par le mode IDS",
+      "Sera supplantée par la whitelist",
+    ],
+    a: [0, 1],
+  },
+  {
+    id: "csne-ips-q2",
+    t: "csne-ips",
+    lv: "CSNE",
+    k: "th",
+    q: "Le trafic entrant sur les interfaces externes ne lève jamais d’alarme d’usurpation d’adresse IP.",
+    o: VF,
+    fix: true,
+    a: [1],
+  },
+  {
+    id: "csne-ips-q3",
+    t: "csne-ips",
+    lv: "CSNE",
+    k: "th",
+    q: "Les alarmes de spoofing ne sont pas bloquantes si la règle de filtrage correspondant au trafic est configurée en mode IDS.",
+    o: VF,
+    fix: true,
+    a: [0],
+  },
+  {
+    id: "csne-ips-q4",
+    t: "csne-ips",
+    lv: "CSNE",
+    k: "th",
+    q: "Le bit DF est ignoré par défaut par le firewall Stormshield. Il fragmentera les datagrammes si nécessaire.",
+    o: VF,
+    fix: true,
+    a: [1],
+  },
+  {
+    id: "csne-ips-q5",
+    t: "csne-ips",
+    lv: "CSNE",
+    k: "th",
+    q: "Que fait le mode furtif ?",
+    o: [
+      "Empêche toute modification de l’entête IP",
+      "Cache l’identité réelle de l’émetteur du datagramme",
+      "Inhibe l’envoi de notification ICMP par le système",
+    ],
+    a: [2],
+  },
+  {
+    id: "csne-ips-q6",
+    t: "csne-ips",
+    lv: "CSNE",
+    k: "th",
+    q: "L’option de l’ASQ « taille minimale d’un fragment » s’applique :",
+    o: [
+      "Uniquement au premier fragment",
+      "Uniquement au dernier fragment",
+      "À tous les fragments sauf le premier et le dernier",
+      "À tous les fragments sans distinction",
+      "À tous les fragments sauf le dernier",
+    ],
+    a: [4],
+  },
+  {
+    id: "csne-ips-q7",
+    t: "csne-ips",
+    lv: "CSNE",
+    k: "th",
+    q: "Tous les paquets circulant dans une connexion sont évalués par la politique de filtrage :",
+    o: VF,
+    fix: true,
+    a: [1],
+  },
+  {
+    id: "csne-ips-q8",
+    t: "csne-ips",
+    lv: "CSNE",
+    k: "th",
+    q: "La MSS est une valeur négociée lors du handshake TCP et qui devient dès lors commune aux deux correspondants.",
+    o: VF,
+    fix: true,
+    a: [1],
+  },
+  {
+    id: "csne-ips-q9",
+    t: "csne-ips",
+    lv: "CSNE",
+    k: "th",
+    q: "Le proxy SYN permet de réécrire les numéros de séquence avec un aléa fort afin de se protéger des attaques de vol de session.",
+    o: VF,
+    fix: true,
+    a: [1],
+  },
+  {
+    id: "csne-ips-q10",
+    t: "csne-ips",
+    lv: "CSNE",
+    k: "th",
+    q: "Le plugin HTTP perturbe le trafic entre mes serveurs internes et lève des alarmes d’inconformité. La seule solution est d’appliquer sur ces règles de filtrage le mode d’inspection IDS ou firewall.",
+    o: VF,
+    fix: true,
+    a: [1],
+  },
+  {
+    id: "csne-ips-q11",
+    t: "csne-ips",
+    lv: "CSNE",
+    k: "th",
+    q: "L’attachement explicite d’un plugin par une règle de filtrage est prépondérant sur toute autre méthode d’attachement.",
+    o: VF,
+    fix: true,
+    a: [0],
+  },
+  {
+    id: "csne-ips-q12",
+    t: "csne-ips",
+    lv: "CSNE",
+    k: "th",
+    q: "Des flux autorisés par une règle « pass from any to any port any mode IPS » dont le champ protocole est vide pourront lever des alarmes d’inconformité sur des protocoles applicatifs.",
+    o: VF,
+    fix: true,
+    a: [0],
+  },
+  {
+    id: "csne-ips-q13",
+    t: "csne-ips",
+    lv: "CSNE",
+    k: "th",
+    q: "Suite à la levée d’une alarme sensible sur ma connexion FTP, mes canaux de données ne pourront plus s’établir.",
+    o: VF,
+    fix: true,
+    a: [0],
+  },
+  // ======================= CSNE : Infrastructure à clés publiques (p. 157) =======================
+  {
+    id: "csne-pki-q1",
+    t: "csne-pki",
+    lv: "CSNE",
+    k: "th",
+    q: "Pour permettre des échanges confidentiels avec moi, je transmets ma clef privée uniquement à des personnes de confiance.",
+    o: VF,
+    fix: true,
+    a: [1],
+  },
+  {
+    id: "csne-pki-q2",
+    t: "csne-pki",
+    lv: "CSNE",
+    k: "th",
+    q: "Une autorité de certification est toujours signée par une autorité de niveau supérieur.",
+    o: VF,
+    fix: true,
+    a: [1],
+  },
+  {
+    id: "csne-pki-q3",
+    t: "csne-pki",
+    lv: "CSNE",
+    k: "th",
+    q: "Parce qu’elle contient des informations confidentielles, la CRL doit être conservée en sécurité par l’autorité qui l’émet.",
+    o: VF,
+    fix: true,
+    a: [1],
+  },
+  // ======================= CSNE : Proxy SSL (p. 187) =======================
+  {
+    id: "csne-ssl-q1",
+    t: "csne-ssl",
+    lv: "CSNE",
+    k: "th",
+    q: "Afin de déchiffrer les flux, le proxy SSL décrypte la clef négociée lors du handshake TLS.",
+    o: VF,
+    fix: true,
+    a: [1],
+  },
+  {
+    id: "csne-ssl-q2",
+    t: "csne-ssl",
+    lv: "CSNE",
+    k: "th",
+    q: "L’action « passer sans déchiffrer » ne nécessite pas d’importer sur les postes des utilisateurs le certificat de l’AC utilisée dans le proxy SSL.",
+    o: VF,
+    fix: true,
+    a: [0],
+  },
+  {
+    id: "csne-ssl-q3",
+    t: "csne-ssl",
+    lv: "CSNE",
+    k: "th",
+    q: "Une action de déchiffrement de la part du proxy SSL est obligatoire si l’administrateur souhaite configurer une redirection vers le portail captif pour des sites utilisant HTTPS.",
+    o: VF,
+    fix: true,
+    a: [0],
   },
 ];

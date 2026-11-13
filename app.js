@@ -464,6 +464,8 @@ const qz = {
   cfg: Object.assign({ lv: "all", k: "all", t: "all", n: 10 }, ls.get("quizcfg", {})),
   run: null, // session en cours : { list, i, sel, ord, done, res }
 };
+// Catégories du QCM : les niveaux Cisco, plus les autres valeurs de lv présentes dans quiz.js (ex. CSNE).
+const QLV = [...LEVELS, ...[...new Set(Q.map((q) => q.lv))].filter((v) => !LEVELS.some(([k]) => k == v)).map((v) => [v, v])];
 const qtName = (t) => (byId(t) || {}).name || QT[t] || t;
 // Questions qui correspondent aux réglages (skip : réglage à ignorer).
 const qpool = (skip) =>
@@ -495,7 +497,11 @@ function qnext(i) {
   r.i = i;
   r.done = false;
   r.sel = new Set();
-  if (i < r.list.length) r.ord = shuffle(r.list[i].o.map((_, j) => j));
+  // Les réponses sont mélangées, sauf si la question demande de garder l'ordre (fix : Vrai / Faux).
+  if (i < r.list.length) {
+    const ord = r.list[i].o.map((_, j) => j);
+    r.ord = r.list[i].fix ? ord : shuffle(ord);
+  }
   render();
   window.scrollTo(0, 0);
 }
@@ -541,7 +547,7 @@ function quiz() {
       <div class="opts">${opts}</div>
       ${
         r.done
-          ? `<div class="why ${good ? "ok" : "ko"}"><b>${good ? "✓ Bonne réponse" : "✗ Mauvaise réponse"}</b><p>${esc(q.why)}</p>${byId(q.t) ? `<a href="#guide/${q.t}">Revoir la fiche ${esc(qtName(q.t))} →</a>` : ""}</div>
+          ? `<div class="why ${good ? "ok" : "ko"}"><b>${good ? "✓ Bonne réponse" : "✗ Mauvaise réponse"}</b>${q.why ? `<p>${esc(q.why)}</p>` : ""}${byId(q.t) ? `<a href="#guide/${q.t}">Revoir la fiche ${esc(qtName(q.t))} →</a>` : ""}</div>
              <div class="acts"><button class="pri" data-a="qnext">${r.i + 1 < r.list.length ? "Question suivante" : "Voir le résultat"}</button></div>`
           : `<div class="acts"><button class="pri" data-a="qcheck" ${r.sel.size ? "" : "disabled"}>Valider</button></div>`
       }
@@ -592,14 +598,14 @@ function qhome() {
   $("#out").innerHTML = `
     <div class="card qcard">
       <h2>Entraînement</h2>
-      <p>${Q.length} questions à choix unique ou multiple, de niveau CCNA et CCNP ENCOR. ${Math.round((100 * Q.filter((q) => q.k == "sit").length) / Q.length)} % sont des mises en situation : un besoin ou une panne, et les commandes à choisir. Chaque réponse est expliquée.</p>
+      <p>${Q.length} questions à choix unique ou multiple, réparties en ${QLV.length} catégories : ${QLV.map(([, l]) => l).join(", ")}. ${Math.round((100 * Q.filter((q) => q.k == "sit").length) / Q.length)} % sont des mises en situation : un besoin ou une panne, et les commandes à choisir. Les réponses CCNA et CCNP ENCOR sont expliquées.</p>
       <div class="tiles">
         <div><b>${seen.length}<small> / ${Q.length}</small></b><span>questions vues</span></div>
         <div><b>${tries ? Math.round((100 * oks) / tries) + " %" : "–"}</b><span>de réussite</span></div>
         <div><b>${wrong.length}</b><span>à revoir</span></div>
       </div>
       <div class="qcfg">
-        <div><span>Niveau</span>${chips("lv", [["all", "Tous"], ...LEVELS])}</div>
+        <div><span>Catégorie</span>${chips("lv", [["all", "Toutes"], ...QLV])}</div>
         <div><span>Type</span>${chips("k", [["all", "Tous"], ["sit", "Mises en situation"], ["th", "Théorie"]])}</div>
         <div><span>Thème</span><select id="qtopic" aria-label="Thème"><option value="all">Tous les thèmes</option>${topics
           .map((t) => `<option value="${t}" ${c.t == t ? "selected" : ""}>${esc(qtName(t))} (${qpool("t").filter((q) => q.t == t).length})</option>`)
@@ -644,7 +650,7 @@ function qend() {
         <div class="corr">
           <p class="qq">${qtext(q.q)}</p>
           ${q.a.map((j) => `<div class="opt good static"><span class="ol">✓</span><span class="ob">${qopt(q, j)}</span></div>`).join("")}
-          <p>${esc(q.why)}</p>
+          ${q.why ? `<p>${esc(q.why)}</p>` : ""}
           ${byId(q.t) ? `<a href="#guide/${q.t}">Revoir la fiche ${esc(qtName(q.t))} →</a>` : ""}
         </div>`,
               )
