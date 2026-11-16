@@ -1031,6 +1031,69 @@ Chemin B : local preference 100, AS-path de 1 AS`,
     a: [0],
     why: "Un applet se déclenche sur un événement, ici un message syslog. Ses commandes CLI partent du mode utilisateur : il faut passer par enable puis configure terminal avant de modifier l'interface.",
   },
+  // ======================= CCNP ENCOR : VTP =======================
+  {
+    id: "vtp-bomb",
+    t: "vtp",
+    lv: "ENCOR",
+    k: "sit",
+    q: "Un switch récupéré d'un autre labo est branché en trunk sur le réseau du domaine LAB. Quelques secondes plus tard, les VLAN de tous les switchs ont été remplacés par ceux de l'ancien labo. Quelle configuration, appliquée sur ce switch avant de le brancher, aurait évité ça ?",
+    cmd: true,
+    o: [
+      "vtp mode transparent\nvtp mode client",
+      "vtp domain LAB",
+      "vtp pruning",
+      "vtp version 2",
+    ],
+    a: [0],
+    why: "Le switch avait le même domaine et un numéro de révision plus élevé que le réseau : tout le domaine a adopté sa base VLAN, même s'il était en mode client. Passer en transparent remet la révision à 0 ; revenu en client, il ne peut plus qu'apprendre la base du serveur. Lui donner le nom du domaine est justement ce qui rend l'écrasement possible.",
+  },
+  {
+    id: "vtp-domain",
+    t: "vtp",
+    lv: "ENCOR",
+    k: "sit",
+    q: "SW2 ne reçoit aucun des VLAN créés sur SW1, alors que le trunk entre eux fonctionne. D'après les sorties ci-dessous, quelle commande corrige le problème sur SW2 ?",
+    ctx: `SW1# show vtp status | include Domain|Mode|Revision
+VTP Domain Name                 : LAB
+VTP Operating Mode              : Server
+Configuration Revision          : 12
+
+SW2# show vtp status | include Domain|Mode|Revision
+VTP Domain Name                 : Lab
+VTP Operating Mode              : Client
+Configuration Revision          : 0`,
+    cmd: true,
+    o: ["vtp domain LAB", "vtp mode server", "vtp password LAB", "vtp mode transparent"],
+    a: [0],
+    why: "Le nom du domaine est sensible à la casse : LAB et Lab sont deux domaines différents, donc SW2 ignore les annonces de SW1. Une fois le domaine corrigé, SW2 (révision 0) apprend la base du serveur.",
+  },
+  {
+    id: "vtp-transparent",
+    t: "vtp",
+    lv: "ENCOR",
+    k: "sit",
+    q: "SW3 doit garder sa propre liste de VLAN, sans appliquer celle du serveur VTP, mais continuer à relayer les annonces vers les switchs placés derrière lui. Quelle commande utilises-tu ?",
+    cmd: true,
+    o: ["vtp mode transparent", "vtp mode client", "vtp mode off", "vtp mode server"],
+    a: [0],
+    why: "En mode transparent, le switch gère ses VLAN localement et relaie les annonces sans les appliquer. En mode off, il ne relaie plus rien : les switchs derrière lui seraient coupés du domaine. Client et server appliquent les annonces.",
+  },
+  {
+    id: "vtp-roles",
+    t: "vtp",
+    lv: "ENCOR",
+    k: "th",
+    q: "Dans un domaine VTP version 2, quelle affirmation est vraie ?",
+    o: [
+      "Seuls les switchs en mode server peuvent créer des VLAN propagés au reste du domaine.",
+      "Un switch en mode client peut créer des VLAN, mais ils restent locaux.",
+      "VTP propage aussi l'affectation des ports d'accès aux VLAN.",
+      "Les VLAN 1006 à 4094 sont propagés comme les autres.",
+    ],
+    a: [0],
+    why: "Un client ne peut pas créer de VLAN du tout, et un switch transparent ne crée que des VLAN locaux. VTP ne transporte que la base VLAN (numéros et noms), jamais la configuration des ports. Les VLAN étendus ne sont propagés qu'en version 3.",
+  },
   // ======================= CSNE : Prévention d'intrusion (p. 101-103) =======================
   {
     id: "csne-ips-q1",
