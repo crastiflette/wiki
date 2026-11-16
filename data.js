@@ -2312,6 +2312,107 @@ show vlan private-vlan`,
     },
   },
   {
+    name: "VTP",
+    level: "ENCOR",
+    category: "",
+    prompt: "SW1",
+    description:
+      "VTP (VLAN Trunking Protocol) propage la liste des VLAN d'un switch serveur vers les autres switchs du même domaine, à travers les trunks : un VLAN créé une fois sur le serveur apparaît partout. Il ne gère que la base VLAN, pas l'affectation des ports. Mal maîtrisé, il peut effacer les VLAN de tout le réseau : beaucoup de réseaux le laissent en mode transparent.",
+    config: `! Nom du domaine : identique sur tous les switchs (sensible à la casse)
+vtp domain <DOMAIN_NAME>
+! Version : 2 (la plus répandue) ou 3 (VLAN étendus, serveur primaire)
+vtp version 2
+! Rôle du switch : server, client ou transparent
+vtp mode server
+! Mot de passe du domaine, identique partout
+vtp password <PASSWORD>
+! N'envoie le trafic d'un VLAN sur un trunk que si l'autre côté en a besoin
+vtp pruning`,
+    show: `show vtp status
+show vtp password
+show vlan brief
+show interfaces trunk`,
+    troubleshoot: `show vtp status | include Domain|Mode|Revision
+show vtp counters
+show interfaces pruning
+show interfaces trunk`,
+    debug: `debug sw-vlan vtp events
+debug sw-vlan vtp packets`,
+    id: "vtp",
+    requires: ["vlan", "trunk"],
+    guide: {
+      steps: [
+        {
+          title: "Choisir la version et le domaine",
+          level: "req",
+          note: "Sur tous les switchs. Le nom du domaine est sensible à la casse : LAB et Lab sont deux domaines différents, qui ne se synchronisent pas. Un switch sans domaine adopte celui de la première annonce reçue.",
+          config: `vtp domain <DOMAIN_NAME>
+vtp version 2`,
+          verify: `show vtp status | include Version|Domain`,
+        },
+        {
+          title: "Définir le rôle de chaque switch",
+          level: "req",
+          note: "server : crée les VLAN et les annonce. client : applique les annonces, ne peut pas créer de VLAN. transparent : garde sa propre liste et relaie les annonces sans les appliquer. En général, un ou deux serveurs, et les autres en client.",
+          config: `! Sur le switch de cœur
+vtp mode server
+! Sur les switchs d'accès
+vtp mode client`,
+          verify: `show vtp status | include Mode`,
+        },
+        {
+          title: "Protéger le domaine par un mot de passe",
+          level: "reco",
+          note: "Les annonces sans le bon mot de passe sont ignorées : un switch branché par erreur ne peut plus modifier les VLAN du domaine.",
+          config: `vtp password <PASSWORD>`,
+          verify: `show vtp password`,
+        },
+        {
+          title: "Créer les VLAN sur le serveur et vérifier la synchronisation",
+          level: "req",
+          note: "Chaque modification sur le serveur augmente le numéro de révision. Les switchs du domaine doivent tous afficher le même numéro et la même liste de VLAN.",
+          config: `vlan <VLAN_ID>
+ name <VLAN_NAME>`,
+          verify: `show vtp status
+show vlan brief`,
+        },
+        {
+          title: "Activer le pruning",
+          level: "opt",
+          note: "À configurer sur le serveur, qui l'annonce au domaine. Le broadcast d'un VLAN n'est plus envoyé sur un trunk qui ne mène à aucun port de ce VLAN.",
+          config: `vtp pruning`,
+          verify: `show interfaces pruning`,
+        },
+        {
+          title: "Remettre le numéro de révision à zéro avant d'ajouter un switch",
+          level: "reco",
+          note: "À faire sur tout switch qui a déjà servi ailleurs, avant de le brancher en trunk. Passer en transparent (ou changer de domaine) remet la révision à 0 : le switch apprendra la base du serveur au lieu de l'écraser.",
+          config: `vtp mode transparent
+vtp mode client`,
+          verify: `show vtp status | include Revision`,
+        },
+        {
+          title: "Désigner le serveur primaire",
+          level: "opt",
+          section: "VTP version 3",
+          note: "En version 3, un seul switch, le serveur primaire, peut modifier les VLAN du domaine : l'écrasement accidentel devient impossible. vtp primary est une commande du mode privilégié, qui demande une confirmation. La version 3 propage aussi les VLAN étendus (1006 à 4094).",
+          config: `vtp version 3
+vtp mode server
+do vtp primary vlan`,
+          verify: `show vtp status`,
+        },
+      ],
+      pitfalls: [
+        "Switch d'occasion branché avec le même domaine et un numéro de révision plus élevé : sa base VLAN écrase celle de tout le domaine, même s'il est en mode client.",
+        "Nom de domaine ou mot de passe différent (majuscules comprises) : aucune synchronisation, sans message d'erreur évident.",
+        "VTP ne circule que sur les trunks : un switch relié par un port d'accès ne reçoit rien.",
+        "Création d'un VLAN refusée sur un client : « VTP VLAN configuration not allowed when device is in CLIENT mode ».",
+        "VLAN 1006 à 4094 en version 1 ou 2 : ils ne se créent qu'en mode transparent et ne sont pas propagés.",
+        "En mode server ou client, les VLAN sont dans vlan.dat et n'apparaissent pas dans la running-config.",
+      ],
+    },
+  },
+  {
     name: "VOIP",
     level: "ENCOR",
     category: "svc",

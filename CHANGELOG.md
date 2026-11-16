@@ -1,5 +1,15 @@
 # Historique des versions
 
+## v2.1.0 — fiche VTP
+
+- Nouvelle fiche **VTP** (CCNP ENCOR), rangée avec les fiches de commutation après PVLAN :
+  guide en 7 étapes (domaine et version, rôles server / client / transparent, mot de passe,
+  vérification de la synchronisation, pruning, remise à zéro du numéro de révision, serveur
+  primaire en version 3), pièges courants, schéma de topologie et exemple de sortie de
+  `show vtp status`.
+- 4 questions VTP dans l'entraînement (3 mises en situation, 1 de théorie), avec explications.
+- 35 fiches au total. Rédigé de mémoire, sans test sur un équipement réel.
+
 ## v2.0.0 — refonte
 
 Refonte complète de l'interface, nouveau mode Entraînement (QCM) et contenu étendu.

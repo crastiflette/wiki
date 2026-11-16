@@ -189,6 +189,17 @@ const X = {
                          | Gi0/10 : copie du trafic de Gi0/1
                      Analyseur
                     (Wireshark)`,
+    vtp: `              SW1  (server)
+         domaine LAB, révision 12
+          /                    \\
+   trunk /                      \\ trunk
+        /                        \\
+     SW2 (client)            SW3 (transparent)
+   révision 12               révision 0
+   VLAN appris de SW1        VLAN locaux, relaie
+                             les annonces
+                                  |  trunk
+                             SW4 (client), révision 12`,
   },
   out: {
     "show ip interface brief": {
@@ -206,6 +217,25 @@ Gi0/2                 notconnect   1            auto   auto 10/100/1000BaseTX
 Gi0/3                 err-disabled 10           auto   auto 10/100/1000BaseTX
 Gi0/24    Vers-SW2    connected    trunk      a-full  a-1000 10/100/1000BaseTX`,
       read: "connected : lien actif. notconnect : rien de branché. err-disabled : port coupé par une protection (port security, BPDU Guard…). La colonne Vlan indique trunk pour un trunk.",
+    },
+    "show vtp status": {
+      out: `VTP Version capable             : 1 to 3
+VTP version running             : 2
+VTP Domain Name                 : LAB
+VTP Pruning Mode                : Enabled
+VTP Traps Generation            : Disabled
+Device ID                       : 0c1a.2b3c.4d00
+Configuration last modified by 10.0.0.1 at 3-1-93 00:14:52
+Local updater ID is 10.0.0.1 on interface Vl1 (lowest numbered VLAN interface found)
+
+Feature VLAN:
+--------------
+VTP Operating Mode                : Server
+Maximum VLANs supported locally   : 255
+Number of existing VLANs          : 8
+Configuration Revision            : 12
+MD5 digest                        : 0x3D 0x05 0xEE 0x1F 0x35 0xCC 0x7C 0x74`,
+      read: "Vérifie le domaine et la version, identiques sur tous les switchs, puis le mode. Configuration Revision et Number of existing VLANs doivent être les mêmes partout : une révision différente signale un switch qui ne se synchronise pas.",
     },
     "show vlan brief": {
       out: `VLAN Name                             Status    Ports
