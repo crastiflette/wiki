@@ -1,5 +1,18 @@
 # Historique des versions
 
+## v2.3.0 — QCM : au moins 5 questions par fiche
+
+- **112 nouvelles questions** : chacune des 35 fiches en a désormais au moins 5 (PVLAN n'en avait
+  aucune). Le QCM passe de 85 à **197 questions** : 105 CCNA, 73 CCNP ENCOR et 19 CSNE.
+- Mises en situation (configuration à choisir, sortie de commande à analyser) et questions de
+  théorie (valeurs par défaut, ports, ordre de décision, plages d'adresses…), toutes expliquées.
+- Chaque fait sur lequel repose une question a été vérifié par recherche en ligne avant
+  l'écriture (documentation Cisco, RFC, guides de configuration). Quand les sources se
+  contredisaient (par exemple le sens de « up/down » sur un port Ethernet), la question a été
+  écartée.
+- Les nouvelles questions sont regroupées dans `quiz.js`, dans deux sections « compléments » : une
+  pour le CCNA, une pour le CCNP ENCOR.
+
 ## v2.2.0 — relecture et corrections
 
 Relecture complète des fiches, des schémas, des exemples de sortie et du QCM, confrontée à la
