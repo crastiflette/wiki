@@ -1,5 +1,56 @@
 # Historique des versions
 
+## v2.2.0 — relecture et corrections
+
+Relecture complète des fiches, des schémas, des exemples de sortie et du QCM, confrontée à la
+documentation Cisco et Stormshield.
+
+### Suppression de la v1
+
+- Le dossier `v1/` et le lien « version précédente » de la barre latérale sont supprimés.
+- Les favoris enregistrés par la v1 dans le navigateur sont toujours repris automatiquement.
+
+### Corrections
+
+- **BGP** : `show ip bgp neighbors … received-routes` exige `neighbor … soft-reconfiguration inbound`.
+  La commande de dépannage devient `… routes`, et une étape facultative explique comment activer
+  `received-routes`.
+- **NAT** : la raison donnée contre `permit any` est corrigée (consommation des ressources du
+  routeur, d'après Cisco).
+- **VRF** : IOS prévient bien quand `vrf forwarding` efface l'adresse IP (message cité).
+  `show ip interface brief vrf`, non documentée, est remplacée par `show ip vrf interfaces`.
+- **Wireless (9800)** : le default-policy-tag diffuse les WLAN d'ID 1 à 16 avec le profil de
+  politique par défaut. Un WLAN sans tag personnalisé n'est donc pas forcément invisible.
+- **GRE / IPsec** : une clé partagée différente se voit plutôt en MM_KEY_EXCH, pas en MM_NO_STATE.
+- **SSH** : 2048 bits au minimum (IOS XE 17.11.1 et suivants refusent les clés RSA plus courtes),
+  au lieu de « au moins 768 bits ».
+- **OSPF** : le masque n'est vérifié que sur les réseaux multi-accès. Un type de réseau différent
+  laisse le voisinage monter en FULL, mais les routes ne s'installent pas.
+- **VOIP** : fiche réécrite. La configuration en trunk, non prise en charge pour le voice VLAN, est
+  retirée. AutoQoS devient la méthode principale (anciens Catalyst comme Catalyst 9000).
+  `mls qos` reste en option, réservé aux 2960, 3560 et 3750. La fiche passe au niveau CCNA, comme le
+  voice VLAN dans le programme.
+- **Sécurité de port** : 3 adresses MAC pour un téléphone IP avec un PC derrière, comme dans la
+  fiche VOIP. La fiche Port Security indiquait 2.
+
+### Précisions
+
+- Redistribution : sur IOS XE récent, `subnets` est implicite.
+- LACP : norme IEEE 802.1AX (autrefois 802.3ad).
+- EIGRP : publié en RFC 7868 depuis 2016.
+- SD-WAN : nouveaux noms des contrôleurs depuis la version 20.12 (SD-WAN Manager, Validator,
+  Controller).
+- Interfaces : `show interfaces status` et `show interfaces counters errors` sont réservées aux
+  switchs.
+- VLAN : un VLAN n'est pas créé automatiquement en VTP client ou s'il a été supprimé après coup.
+
+### QCM
+
+- 85 questions au total : 40 CCNA, 26 CCNP ENCOR, 19 CSNE (catégorie ajoutée après la v2.1.0).
+- Explications complétées pour `vlan-missing` et `sdwan-roles`.
+- À vérifier dans le support de cours CSNE : `csne-ips-q3` (alarmes de spoofing en mode IDS). Le
+  guide ANSSI de SNS v4.3 indique que l'anti-spoofing s'applique avant la politique de filtrage.
+
 ## v2.1.0 — fiche VTP
 
 - Nouvelle fiche **VTP** (CCNP ENCOR), rangée avec les fiches de commutation après PVLAN :
@@ -124,13 +175,8 @@ NETCONF / RESTCONF / EEM, IP SLA / Tracking, SPAN / NetFlow.
 Guide (26 fiches), vues Tout / CCNA / CCNP ENCOR / Security / Services / Troubleshooting /
 All commands, Favoris, Entraînement à trous. Dernier commit : `274762f`.
 
-## Revenir à la v1
+## Retrouver la v1
 
-- **Sans rien toucher** : la v1 est consultable à l'adresse `/v1/` du site (lien « version
-  précédente » en bas de la barre latérale). Elle garde ses propres favoris et son score.
-- **Tant que la branche n'est pas fusionnée** : `main` contient toujours la v1, le site en ligne ne
-  change pas.
-- **Après fusion, pour annuler la v2** : `git revert -m 1 <commit de fusion>` (ou « Revert » sur la
-  pull request dans GitHub).
-- **Point de repère** : le commit `274762f` est la v1.0. Pour le marquer d'un tag :
-  `git tag v1.0 274762f && git push origin v1.0`.
+L'archive `/v1/` a été supprimée en v2.2.0 et n'est plus en ligne. Son code reste dans l'historique
+git : le commit `274762f` est la v1.0. Pour le marquer d'un tag :
+`git tag v1.0 274762f && git push origin v1.0`.

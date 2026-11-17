@@ -159,12 +159,6 @@ nav a small {
   padding: 0 6px;
   margin-top: -12px;
 }
-#verline a {
-  color: inherit;
-}
-#verline a:hover {
-  color: #fff;
-}
 #th {
   margin-top: auto;
   text-align: left;
