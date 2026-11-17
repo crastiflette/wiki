@@ -382,7 +382,7 @@ Minimum expected Diffie Hellman key size : 2048 bits`,
       out: `IPv4 Crypto ISAKMP SA
 dst             src             state          conn-id status
 198.51.100.2    203.0.113.1     QM_IDLE           1001 ACTIVE`,
-      read: "QM_IDLE et ACTIVE : la phase 1 est montée. MM_NO_STATE : la politique IKE ne correspond pas ou l'autre côté ne répond pas. MM_KEY_EXCH : clé partagée différente.",
+      read: "QM_IDLE et ACTIVE : la phase 1 est montée. MM_NO_STATE : la politique IKE ne correspond pas ou l'autre côté ne répond pas. MM_KEY_EXCH : le plus souvent une clé partagée différente (debug crypto isakmp le confirme).",
     },
     "show policy-map interface <INTERFACE>": {
       out: ` GigabitEthernet0/1

@@ -61,7 +61,7 @@ VLAN Name                 Status    Ports
       "interface gi0/3\n spanning-tree portfast",
     ],
     a: [0],
-    why: "Le VLAN 30 n'existe pas dans la base VLAN et Gi0/3 n'apparaît dans aucun VLAN : le port est inactif. Il suffit de créer le VLAN (vlan 30) pour que le port redevienne actif.",
+    why: "Le VLAN 30 n'existe pas dans la base VLAN et Gi0/3 n'apparaît dans aucun VLAN : le port est inactif. Il suffit de créer le VLAN (vlan 30) pour que le port redevienne actif. D'habitude, le switch crée le VLAN de lui-même quand on tape switchport access vlan ; ici, il a été supprimé ensuite (ou le switch est client VTP).",
   },
   {
     id: "trunk-add",
@@ -997,7 +997,7 @@ Chemin B : local preference 100, AS-path de 1 AS`,
     q: "Dans Cisco SD-WAN, quel composant constitue le plan de contrôle et distribue les routes et les politiques aux routeurs WAN Edge avec le protocole OMP ?",
     o: ["vSmart", "vManage", "vBond", "Le WAN Edge lui-même"],
     a: [0],
-    why: "vSmart est le contrôleur : il échange les routes et les politiques en OMP. vManage est l'interface de gestion, vBond authentifie et met en relation les équipements, et les WAN Edge forment le plan de données.",
+    why: "vSmart est le contrôleur : il échange les routes et les politiques en OMP. vManage est l'interface de gestion, vBond authentifie et met en relation les équipements, et les WAN Edge forment le plan de données. Depuis la version 20.12, vSmart, vManage et vBond s'appellent SD-WAN Controller, SD-WAN Manager et SD-WAN Validator.",
   },
   {
     id: "sdwan-control",

@@ -152,10 +152,9 @@ interface GigabitEthernet0/1
  no shutdown`,
     show: `show ip interface brief
 show interfaces
-show interfaces status
 show interfaces description`,
     troubleshoot: `show interfaces <INTERFACE>
-show interfaces counters errors
+show interfaces <INTERFACE> | include errors|CRC|collisions
 show controllers <INTERFACE>`,
     debug: ``,
     id: "interfaces",
@@ -207,11 +206,12 @@ show controllers <INTERFACE>`,
           title: "Éteindre les ports inutilisés",
           level: "reco",
           prompt: "SW1",
-          note: "Sur un switch, tous les ports sont actifs par défaut : n'importe qui peut brancher un équipement. interface range configure plusieurs ports d'un coup.",
+          note: "Sur un switch, tous les ports sont actifs par défaut : n'importe qui peut brancher un équipement. interface range configure plusieurs ports d'un coup. show interfaces status et show interfaces counters errors n'existent que sur les switchs.",
           config: `interface range <INTERFACE_RANGE>
  description UNUSED
  shutdown`,
-          verify: `show interfaces status`,
+          verify: `show interfaces status
+show interfaces counters errors`,
         },
       ],
       pitfalls: [
@@ -311,7 +311,7 @@ ip default-gateway <GATEWAY_IP>`,
       ],
       pitfalls: [
         "Laisser les utilisateurs ou le management dans le VLAN 1 : c'est le VLAN par défaut de tous les ports, la première cible d'une attaque.",
-        "switchport access vlan sur un VLAN qui n'existe pas : le switch le crée automatiquement, sans nom (% Access VLAN does not exist. Creating vlan ...).",
+        "switchport access vlan sur un VLAN qui n'existe pas : le switch le crée automatiquement, sans nom (% Access VLAN does not exist. Creating vlan ...). Sauf en VTP client, ou si le VLAN est supprimé ensuite : le port reste alors inactif.",
         "Les VLAN sont dans vlan.dat et pas dans la startup-config : un write erase ne les supprime pas, il faut aussi delete flash:vlan.dat.",
         "Une SVI reste down tant qu'aucun port actif n'appartient à son VLAN (ou qu'aucun trunk ne le transporte).",
       ],
@@ -602,7 +602,7 @@ errdisable recovery interval 300`,
     category: "",
     prompt: "SW1",
     description:
-      "L'EtherChannel regroupe plusieurs liens physiques en un seul lien logique : plus de bande passante et de la redondance. STP le voit comme un seul lien, donc aucun port n'est bloqué. LACP (standard IEEE 802.3ad) ou PAgP (propriétaire Cisco) négocie le groupe avec l'autre équipement ; les deux côtés doivent utiliser le même protocole et les paramètres des ports doivent être identiques des deux côtés.",
+      "L'EtherChannel regroupe plusieurs liens physiques en un seul lien logique : plus de bande passante et de la redondance. STP le voit comme un seul lien, donc aucun port n'est bloqué. LACP (standard IEEE 802.1AX, autrefois 802.3ad) ou PAgP (propriétaire Cisco) négocie le groupe avec l'autre équipement ; les deux côtés doivent utiliser le même protocole et les paramètres des ports doivent être identiques des deux côtés.",
     config: `! Sélectionne tous les ports physiques à regrouper
 interface range <INTERFACE_RANGE>
  ! Les place dans le groupe ; active = ce switch propose LACP à l'autre extrémité
@@ -633,7 +633,7 @@ debug etherchannel`,
  shutdown`,
         },
         {
-          section: "Méthode 1 : LACP (standard IEEE 802.3ad)",
+          section: "Méthode 1 : LACP (standard IEEE 802.1AX, autrefois 802.3ad)",
           title: "Regrouper les ports avec LACP",
           level: "req",
           note: "active : ce switch propose LACP. passive : il attend que l'autre côté le propose. Au moins un des deux côtés doit être en active. À privilégier : fonctionne avec tous les constructeurs.",
@@ -849,7 +849,7 @@ ip nat inside source list NAT_LAN pool <POOL_NAME> overload`,
       pitfalls: [
         "inside et outside inversés : aucune traduction n'apparaît.",
         "Pas de route par défaut vers Internet : la traduction se fait, mais les paquets ne partent nulle part.",
-        "ACL avec permit any : le trafic venant d'Internet peut aussi être traduit, comportement imprévisible.",
+        "ACL avec permit any : Cisco le déconseille, le NAT consomme alors trop de ressources du routeur, ce qui peut perturber le réseau. Limite l'ACL aux réseaux internes.",
         "Après une modification, les anciennes traductions restent : clear ip nat translation *.",
       ],
     },
@@ -1093,7 +1093,8 @@ show ip ospf interface brief`,
         },
       ],
       pitfalls: [
-        "Hello/dead timers, aire, masque ou type de réseau différents entre voisins : le voisinage ne se forme pas.",
+        "Hello/dead timers, aire, authentification ou (sur un réseau multi-accès comme Ethernet) masque différents entre voisins : le voisinage ne se forme pas.",
+        "Type de réseau différent (broadcast d'un côté, point-to-point de l'autre) : le voisinage monte en FULL, mais les deux bases ne décrivent pas le lien de la même façon et les routes ne sont pas installées.",
         "Deux routeurs avec le même router-id : adjacences instables et routes manquantes.",
         "MTU différente : les voisins restent bloqués en EXSTART/EXCHANGE.",
         "passive-interface sur un lien vers un autre routeur : plus de voisin sur ce lien.",
@@ -1369,7 +1370,7 @@ cdp holdtime 180`,
       "SSH permet d'administrer un équipement à distance de façon chiffrée, contrairement à Telnet qui envoie tout, mots de passe compris, en clair. Avant de l'activer, il faut un nom d'hôte, un nom de domaine, une paire de clés RSA et un compte utilisateur.",
     config: `! Nom de domaine, nécessaire pour générer les clés (le hostname doit aussi avoir été changé)
 ip domain-name <DOMAIN>
-! Génère la paire de clés RSA (2048 bits conseillés)
+! Génère la paire de clés RSA (2048 bits minimum sur les IOS XE récents)
 crypto key generate rsa modulus 2048
 ! Compte local pour se connecter
 username <USER> secret <PASSWORD>
@@ -1400,7 +1401,7 @@ show ip ssh`,
         {
           title: "Générer les clés RSA",
           level: "req",
-          note: "2048 bits conseillés. Au moins 768 bits pour SSH version 2.",
+          note: "2048 bits au minimum : depuis IOS XE 17.11.1, les clés RSA plus courtes sont refusées par défaut et le serveur SSH ne démarre pas. show ip ssh affiche la taille de la clé en place.",
           config: `crypto key generate rsa modulus 2048`,
           verify: `show crypto key mypubkey rsa`,
         },
@@ -1493,7 +1494,7 @@ show errdisable recovery`,
         {
           title: "Nombre d'adresses MAC autorisées",
           level: "reco",
-          note: "2 pour un PC derrière un téléphone IP (3 sur certains modèles, le téléphone pouvant compter dans les deux VLAN).",
+          note: "Avec un téléphone IP et un PC derrière lui, mets 3 : le téléphone compte pour 2 adresses (il est vu dans le VLAN voix et dans le VLAN données), le PC pour 1. Sur un port avec un seul poste, 1 ou 2 suffit.",
           config: `interface <INTERFACE>
  switchport port-security maximum 2`,
           verify: `show port-security interface <INTERFACE>`,
@@ -1527,7 +1528,7 @@ errdisable recovery interval 300`,
         "Port en mode dynamique : la commande switchport port-security est refusée.",
         "Adresses sticky non sauvegardées : elles sont perdues au redémarrage.",
         "Port en err-disabled : il faut shutdown puis no shutdown (ou errdisable recovery).",
-        "maximum 1 sur un port avec téléphone IP + PC : violation immédiate.",
+        "maximum 1 ou 2 sur un port avec téléphone IP + PC : violation dès que les deux sont branchés (il en faut 3).",
       ],
     },
   },
@@ -1634,7 +1635,7 @@ ip arp inspection filter STATIC_HOSTS vlan <VLAN_ID>`,
     category: "",
     prompt: "R1",
     description:
-      "EIGRP est un protocole de routage propriétaire Cisco, de type vecteur de distance avancé. Il calcule la meilleure route avec une métrique composite (bande passante et délai) et garde une route de secours (feasible successor) pour basculer très vite. Les voisins doivent partager le même numéro d'AS.",
+      "EIGRP est un protocole de routage créé par Cisco, de type vecteur de distance avancé. Longtemps propriétaire, il est publié depuis 2016 (RFC 7868) mais reste surtout utilisé sur du matériel Cisco. Il calcule la meilleure route avec une métrique composite (bande passante et délai) et garde une route de secours (feasible successor) pour basculer très vite. Les voisins doivent partager le même numéro d'AS.",
     config: `! Lance EIGRP : le numéro d'AS doit être identique chez les voisins
 router eigrp <AS_NUMBER>
  ! Identifiant du routeur
@@ -1752,7 +1753,7 @@ show ip bgp neighbors
 show ip route bgp`,
     troubleshoot: `show ip bgp summary
 show ip bgp neighbors <PEER_IP> advertised-routes
-show ip bgp neighbors <PEER_IP> received-routes`,
+show ip bgp neighbors <PEER_IP> routes`,
     debug: `debug ip bgp updates
 debug ip bgp events
 clear ip bgp <PEER_IP> soft`,
@@ -1808,6 +1809,15 @@ router bgp <LOCAL_AS>
 show ip bgp neighbors <PEER_IP> advertised-routes`,
         },
         {
+          title: "Garder une copie des routes reçues",
+          level: "opt",
+          note: "Sans cette commande, received-routes est refusée (% Inbound soft reconfiguration not enabled) : seules les routes acceptées après filtrage sont visibles, avec routes. Elle garde en mémoire tout ce que le voisin envoie, au prix de plus de mémoire.",
+          config: `router bgp <LOCAL_AS>
+ neighbor <PEER_IP> soft-reconfiguration inbound`,
+          verify: `show ip bgp neighbors <PEER_IP> received-routes
+show ip bgp neighbors <PEER_IP> routes`,
+        },
+        {
           title: "iBGP entre loopbacks",
           level: "opt",
           note: "La session survit à la panne d'un lien. Les loopbacks doivent être joignables par l'IGP (OSPF, EIGRP). next-hop-self évite un next-hop eBGP injoignable.",
@@ -1832,6 +1842,7 @@ show ip bgp neighbors <PEER_IP> advertised-routes`,
         "Voisin bloqué en Active : la session TCP 179 ne s'établit pas (IP, AS, route ou ACL).",
         "iBGP : une route apprise d'un voisin iBGP n'est pas transmise aux autres. Il faut un maillage complet (ou des route reflectors).",
         "Next-hop eBGP injoignable dans l'AS : la route est dans show ip bgp mais pas dans la table de routage. Utilise next-hop-self.",
+        "show ip bgp neighbors … received-routes refusée : elle exige neighbor … soft-reconfiguration inbound. Sans elle, utilise … routes (routes acceptées).",
       ],
     },
   },
@@ -1882,7 +1893,7 @@ route-map <MAP_NAME> permit 20`,
         {
           title: "Redistribuer EIGRP dans OSPF",
           level: "req",
-          note: "subnets est indispensable, sinon seuls les réseaux de classe entière (sans sous-réseau) passent.",
+          note: "En IOS classique, subnets est indispensable : sans lui, seuls les réseaux de classe entière (sans sous-réseau) passent. Sur IOS XE récent, il est appliqué par défaut et n'apparaît plus dans la configuration ; le taper ne fait pas de mal.",
           config: `router ospf <PROCESS_ID>
  redistribute eigrp <AS_NUMBER> subnets route-map <MAP_NAME>`,
           verify: `show ip ospf database external
@@ -1929,7 +1940,7 @@ show route-map PBR`,
       ],
       pitfalls: [
         "Deny implicite en fin de route-map : sans séquence permit finale, les routes non sélectionnées sont rejetées.",
-        "Oublier subnets dans OSPF : les sous-réseaux ne sont pas redistribués.",
+        "Oublier subnets dans OSPF (IOS classique) : les sous-réseaux ne sont pas redistribués. Sur IOS XE récent, il est implicite.",
         "Pas de métrique de départ dans EIGRP : les routes redistribuées sont ignorées.",
         "Redistribution mutuelle à plusieurs endroits sans tags : boucles de routage et routes instables.",
       ],
@@ -1952,7 +1963,7 @@ interface <INTERFACE>
  ip address <IP_ADDRESS> <SUBNET_MASK>`,
     show: `show vrf
 show ip route vrf <VRF_NAME>
-show ip interface brief vrf <VRF_NAME>`,
+show ip vrf interfaces <VRF_NAME>`,
     troubleshoot: `ping vrf <VRF_NAME> <IP_ADDRESS>
 traceroute vrf <VRF_NAME> <IP_ADDRESS>`,
     debug: ``,
@@ -1976,7 +1987,7 @@ traceroute vrf <VRF_NAME> <IP_ADDRESS>`,
  vrf forwarding <VRF_NAME>
  ip address <IP_ADDRESS> <SUBNET_MASK>
  no shutdown`,
-          verify: `show ip interface brief vrf <VRF_NAME>
+          verify: `show ip vrf interfaces <VRF_NAME>
 show vrf`,
         },
         {
@@ -2007,7 +2018,7 @@ traceroute vrf <VRF_NAME> <IP_ADDRESS>`,
         },
       ],
       pitfalls: [
-        "vrf forwarding après l'adresse IP : l'adresse est effacée sans prévenir clairement.",
+        "vrf forwarding après l'adresse IP : IOS efface l'adresse (% Interface … IPv4 disabled and address(es) removed due to enabling VRF …). Il faut la saisir à nouveau.",
         "ping ou show ip route sans le mot-clé vrf : on regarde la table globale, pas celle de la VRF.",
         "Route statique sans vrf : elle va dans la table globale.",
       ],
@@ -2414,33 +2425,33 @@ do vtp primary vlan`,
   },
   {
     name: "VOIP",
-    level: "ENCOR",
+    level: "CCNA",
     category: "svc",
     prompt: "SW1",
     description:
-      "La VoIP (Voice over IP) transporte la voix sur le réseau IP. Elle nécessite une qualité de service (QoS) pour que la voix ne soit pas dégradée par le trafic de données. Les VLANs séparés pour la voix et les données, ainsi que la priorisation des paquets voix, sont des pratiques courantes.",
-    config: `! Crée un VLAN pour la voix
+      "La VoIP (Voice over IP) transporte la voix sur le réseau IP. Sur un switch, le téléphone et le PC branché derrière lui partagent le même port d'accès : le PC reste dans le VLAN des données, le téléphone utilise un VLAN voix séparé. La voix doit aussi être prioritaire (QoS) pour ne pas être dégradée par le trafic de données.",
+    config: `! Crée le VLAN de la voix
 vlan <VOICE_VLAN>
- name Voice
-! Configure le port pour la VoIP : mode access et VLAN voix
+ name VOICE
+! Port d'accès partagé par le téléphone et le PC branché derrière lui
 interface <INTERFACE>
  switchport mode access
+ ! VLAN des données : le trafic du PC, sans étiquette
  switchport access vlan <DATA_VLAN>
+ ! VLAN voix : annoncé au téléphone par CDP (ou LLDP-MED)
  switchport voice vlan <VOICE_VLAN>
-! Configure le port pour la VoIP : mode trunk et VLAN voix
-interface <INTERFACE>
- switchport mode trunk
- switchport trunk native vlan <DATA_VLAN>
- switchport trunk allowed vlan <DATA_VLAN>,<VOICE_VLAN>
- switchport voice vlan <VOICE_VLAN>
-! Active QoS pour prioriser les paquets voix
-mls qos`,
+ ! Le port passe tout de suite en forwarding au branchement
+ spanning-tree portfast
+ ! QoS automatique : le marquage n'est accepté que si un téléphone Cisco est détecté
+ auto qos voip cisco-phone`,
     show: `show vlan brief
 show interfaces <INTERFACE> switchport
-show mls qos interface`,
-    troubleshoot: `show vlan brief
-show interfaces <INTERFACE> switchport
-show mls qos interface`,
+show auto qos interface <INTERFACE>
+show cdp neighbors`,
+    troubleshoot: `show interfaces <INTERFACE> switchport
+show cdp neighbors detail
+show power inline <INTERFACE>
+show port-security interface <INTERFACE>`,
     debug: ``,
     id: "voip",
     requires: ["vlan"],
@@ -2457,7 +2468,7 @@ show mls qos interface`,
         {
           title: "Port d'accès avec voice VLAN",
           level: "req",
-          note: "Le téléphone apprend le VLAN voix par CDP (ou LLDP-MED) et étiquette son trafic. Le PC branché derrière reste dans le VLAN données, sans étiquette.",
+          note: "Le téléphone apprend le VLAN voix par CDP (ou LLDP-MED) et étiquette son trafic. Le PC branché derrière reste dans le VLAN données, sans étiquette. Le voice VLAN n'est pris en charge que sur un port en mode access : en mode trunk, la commande est acceptée mais sans effet garanti.",
           config: `interface <INTERFACE>
  switchport mode access
  switchport access vlan <DATA_VLAN>
@@ -2466,22 +2477,22 @@ show mls qos interface`,
           verify: `show interfaces <INTERFACE> switchport`,
         },
         {
-          title: "Activer la QoS et faire confiance au téléphone",
+          title: "Prioriser la voix avec AutoQoS",
           level: "reco",
-          note: "Le marquage CoS n'est conservé que si un téléphone Cisco est détecté par CDP : un PC ne peut pas se faire passer pour un téléphone.",
+          note: "Génère toute la configuration QoS (classes, files d'attente, confiance). Le marquage n'est accepté que si un téléphone Cisco est détecté par CDP : un PC ne peut pas se faire passer pour un téléphone. Fonctionne sur les anciens Catalyst comme sur les Catalyst 9000.",
+          config: `interface <INTERFACE>
+ auto qos voip cisco-phone`,
+          verify: `show auto qos interface <INTERFACE>`,
+        },
+        {
+          title: "Ou bien : confiance manuelle (anciens Catalyst)",
+          level: "opt",
+          note: "Seulement sur 2960, 3560 et 3750 : les commandes mls qos n'existent pas sur les Catalyst 9000 (IOS XE), où la QoS se configure en MQC (fiche QoS) ou avec AutoQoS. mls qos active la QoS sur tout le switch : un port sans trust remet alors les marquages à 0.",
           config: `mls qos
 interface <INTERFACE>
  mls qos trust device cisco-phone
  mls qos trust cos`,
           verify: `show mls qos interface <INTERFACE>`,
-        },
-        {
-          title: "Ou bien : AutoQoS",
-          level: "opt",
-          note: "Génère automatiquement toute la configuration QoS pour un téléphone Cisco (files d'attente, confiance, marquage).",
-          config: `interface <INTERFACE>
- auto qos voip cisco-phone`,
-          verify: `show auto qos interface <INTERFACE>`,
         },
         {
           title: "Alimenter le téléphone en PoE",
@@ -2494,7 +2505,7 @@ interface <INTERFACE>
         {
           title: "Adapter la sécurité de port",
           level: "opt",
-          note: "Le téléphone et le PC ont chacun une adresse MAC ; selon les modèles, le téléphone compte aussi dans le VLAN données.",
+          note: "Le téléphone compte pour 2 adresses MAC (il est vu dans le VLAN voix et dans le VLAN données), le PC pour 1 : 3 au total.",
           config: `interface <INTERFACE>
  switchport port-security maximum 3`,
           verify: `show port-security interface <INTERFACE>`,
@@ -2512,10 +2523,11 @@ interface <INTERFACE>
         },
       ],
       pitfalls: [
-        "mls qos activé sans trust : tous les marquages sont remis à 0, la voix perd sa priorité.",
+        "Port en mode trunk avec switchport voice vlan : la commande est acceptée, mais Cisco ne prend en charge le voice VLAN que sur un port d'accès.",
+        "mls qos activé sans trust (anciens Catalyst) : tous les marquages sont remis à 0, la voix perd sa priorité.",
         "VLAN voix non autorisé sur le trunk vers le cœur : le téléphone a un lien mais ne joint pas son serveur.",
         "CDP ou LLDP désactivé sur le port : le téléphone ne connaît pas le VLAN voix et reste dans le VLAN données.",
-        "Port security avec maximum 1 : violation dès que le téléphone et le PC sont branchés.",
+        "Port security avec maximum 1 ou 2 : violation dès que le téléphone et le PC sont branchés.",
       ],
     },
   },
@@ -2631,7 +2643,7 @@ show crypto ipsec sa`,
         "Routage récursif : la route vers la destination du tunnel est apprise par le tunnel, qui monte et tombe en boucle (%TUN-5-RECURDOWN).",
         "tunnel destination pointant sur l'adresse interne du tunnel au lieu de l'adresse publique de l'autre routeur.",
         "Tunnel up/up alors que l'autre côté est injoignable : sans keepalive ni IPsec, un tunnel GRE reste up tant que la route vers la destination existe.",
-        "Politique IKE ou clé partagée différente entre les deux routeurs : la phase 1 ne monte pas (état MM_NO_STATE).",
+        "Politique IKE différente entre les deux routeurs : la phase 1 ne monte pas (état MM_NO_STATE). Clé partagée différente : elle reste bloquée plus loin, souvent en MM_KEY_EXCH. debug crypto isakmp montre l'étape qui échoue.",
         "MTU non ajustée : les petits paquets passent (ping), les gros sont fragmentés ou perdus.",
       ],
     },
@@ -2901,7 +2913,7 @@ show interfaces trunk`,
         {
           title: "Relier WLAN et politique dans un tag",
           level: "req",
-          note: "Sans tag, le WLAN n'est diffusé par aucune borne.",
+          note: "Sans ce tag, les bornes gardent le default-policy-tag : il diffuse les WLAN d'ID 1 à 16 avec le profil de politique par défaut (donc pas dans ton VLAN) et ignore ceux d'ID 17 et plus.",
           config: `wireless tag policy <TAG_NAME>
  wlan <WLAN_NAME> policy <POLICY_NAME>`,
           verify: `show wireless tag policy summary`,
@@ -2925,7 +2937,7 @@ show ap summary`,
       ],
       pitfalls: [
         "WLAN ou profil de politique laissé en shutdown : le SSID n'apparaît pas.",
-        "Tag créé mais attribué à aucune borne : elles gardent le tag par défaut et ne diffusent pas le SSID.",
+        "Tag créé mais attribué à aucune borne : elles gardent le default-policy-tag. Un WLAN d'ID 1 à 16 est quand même diffusé, mais avec le profil de politique par défaut (clients dans le mauvais VLAN) ; un WLAN d'ID 17 ou plus n'est pas diffusé.",
         "VLAN des clients absent du trunk du contrôleur : les clients s'associent mais n'obtiennent pas d'adresse IP.",
         "Borne qui ne rejoint pas le contrôleur : vérifie l'option DHCP 43 ou l'entrée DNS CISCO-CAPWAP-CONTROLLER, et les ports UDP 5246 et 5247.",
         "Heure fausse sur le contrôleur : les certificats des bornes sont refusés.",
@@ -2938,7 +2950,7 @@ show ap summary`,
     category: "",
     prompt: "Edge1",
     description:
-      "Cisco SD-WAN sépare les rôles : vManage administre, vBond met en relation et authentifie, vSmart distribue les routes et les politiques (protocole OMP), et les routeurs WAN Edge transportent les données dans des tunnels IPsec. En production, la configuration vient des modèles de vManage : le CLI sert surtout au premier démarrage et au diagnostic.",
+      "Cisco SD-WAN sépare les rôles : vManage administre, vBond met en relation et authentifie, vSmart distribue les routes et les politiques (protocole OMP), et les routeurs WAN Edge transportent les données dans des tunnels IPsec. Depuis la version 20.12, ces trois contrôleurs s'appellent SD-WAN Manager, SD-WAN Validator et SD-WAN Controller. En production, la configuration vient des modèles de vManage : le CLI sert surtout au premier démarrage et au diagnostic.",
     config: `! Sur un routeur IOS-XE SD-WAN, on configure en transaction, validée par commit
 config-transaction
 ! Identité du routeur dans la fabrique

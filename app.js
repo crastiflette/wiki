@@ -1,5 +1,5 @@
 // Numéro de version affiché dans la barre latérale (voir CHANGELOG.md).
-const VERSION = "2.1.0";
+const VERSION = "2.2.0";
 // Les 4 types de blocs d'une fiche : clé -> libellé affiché.
 const TYPES = { C: "CONFIG", S: "SHOW", T: "TROUBLESHOOT", D: "DEBUG" };
 // Les 4 vues de l'application : [identifiant (aussi utilisé dans l'URL : #ref, #fav…), libellé].
@@ -87,7 +87,7 @@ const st = {
   vo: ls.get("varsOpen", null), // panneau des variables ouvert ou fermé (null = pas encore choisi)
   // Favoris : { k: la commande (précédée de ses lignes parentes), id: fiche d'origine }.
   // Ils sont rangés sous la clé « favs2 ». Au premier lancement, ceux de la v1 (clé « favs », de simples
-  // textes) sont repris en retrouvant leur fiche d'origine ; la v1 archivée dans /v1/ garde les siens.
+  // textes) sont repris en retrouvant leur fiche d'origine.
   favs: (ls.get("favs2", null) || ls.get("favs", [])).map((f) =>
     typeof f == "string"
       ? {
