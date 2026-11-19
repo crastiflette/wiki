@@ -1,5 +1,16 @@
 # Historique des versions
 
+## v2.5.0 — QCM : plusieurs thèmes à la fois
+
+- Le menu déroulant « Thème » de l'Entraînement est remplacé par des boutons **Thèmes** : on peut
+  en cocher plusieurs (par exemple VPN IPsec avancé + Tunnels GRE et GRETAP) pour faire un quiz
+  sur ces thèmes seulement. Un clic coche ou décoche un thème, « Tous » efface la sélection.
+- Les thèmes proposés dépendent toujours de la catégorie et du type choisis. Chaque bouton
+  indique son nombre de questions.
+- La sélection est mémorisée. L'ancien réglage (un seul thème) est repris automatiquement.
+- « S'entraîner sur ce thème » depuis une fiche, et un clic dans « Progression par thème »,
+  sélectionnent toujours ce seul thème.
+
 ## v2.4.0 — QCM CSNE : VPN IPsec avancé et tunnels GRE / GRETAP
 
 - **10 nouvelles questions CSNE**, recopiées des quiz du livre de formation Stormshield CSNE v4.8,

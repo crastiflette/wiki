@@ -1,5 +1,5 @@
 // Numéro de version affiché dans la barre latérale (voir CHANGELOG.md).
-const VERSION = "2.4.0";
+const VERSION = "2.5.0";
 // Les 4 types de blocs d'une fiche : clé -> libellé affiché.
 const TYPES = { C: "CONFIG", S: "SHOW", T: "TROUBLESHOOT", D: "DEBUG" };
 // Les 4 vues de l'application : [identifiant (aussi utilisé dans l'URL : #ref, #fav…), libellé].
@@ -460,10 +460,12 @@ function fav() {
 // Les questions sont dans quiz.js. Les réussites et erreurs sont mémorisées dans le navigateur.
 const qz = {
   stats: ls.get("quiz", {}), // par question : { n: tentatives, ok: réussites, last: dernière tentative réussie ? }
-  // Réglages de l'écran d'accueil : niveau, type de question, thème, nombre de questions (0 = toutes).
-  cfg: Object.assign({ lv: "all", k: "all", t: "all", n: 10 }, ls.get("quizcfg", {})),
+  // Réglages de l'écran d'accueil : niveau, type de question, thèmes (liste vide = tous), nombre de questions (0 = toutes).
+  cfg: Object.assign({ lv: "all", k: "all", t: [], n: 10 }, ls.get("quizcfg", {})),
   run: null, // session en cours : { list, i, sel, ord, done, res }
 };
+// Anciens réglages : un seul thème, ou "all".
+if (!Array.isArray(qz.cfg.t)) qz.cfg.t = qz.cfg.t && qz.cfg.t != "all" ? [qz.cfg.t] : [];
 // Catégories du QCM : les niveaux Cisco, plus les autres valeurs de lv présentes dans quiz.js (ex. CSNE).
 const QLV = [...LEVELS, ...[...new Set(Q.map((q) => q.lv))].filter((v) => !LEVELS.some(([k]) => k == v)).map((v) => [v, v])];
 const qtName = (t) => (byId(t) || {}).name || QT[t] || t;
@@ -473,7 +475,7 @@ const qpool = (skip) =>
     (q) =>
       (qz.cfg.lv == "all" || q.lv == qz.cfg.lv) &&
       (qz.cfg.k == "all" || q.k == qz.cfg.k) &&
-      (skip == "t" || qz.cfg.t == "all" || q.t == qz.cfg.t),
+      (skip == "t" || !qz.cfg.t.length || qz.cfg.t.includes(q.t)),
   );
 // Questions ratées à la dernière tentative.
 const qwrong = () => Q.filter((q) => qz.stats[q.id] && !qz.stats[q.id].last);
@@ -582,7 +584,7 @@ function qhome() {
     wrong = qwrong();
   // Thèmes proposés : ceux qui ont des questions avec le niveau et le type choisis.
   const topics = [...new Set(qpool("t").map((q) => q.t))];
-  if (c.t != "all" && !topics.includes(c.t)) c.t = "all";
+  c.t = c.t.filter((t) => topics.includes(t));
   const chips = (key, list) =>
     list
       .map(([v, l]) => `<button class="${c[key] == v ? "on" : ""}" data-qc="${key}:${v}">${l}</button>`)
@@ -607,9 +609,12 @@ function qhome() {
       <div class="qcfg">
         <div><span>Catégorie</span>${chips("lv", [["all", "Toutes"], ...QLV])}</div>
         <div><span>Type</span>${chips("k", [["all", "Tous"], ["sit", "Mises en situation"], ["th", "Théorie"]])}</div>
-        <div><span>Thème</span><select id="qtopic" aria-label="Thème"><option value="all">Tous les thèmes</option>${topics
-          .map((t) => `<option value="${t}" ${c.t == t ? "selected" : ""}>${esc(qtName(t))} (${qpool("t").filter((q) => q.t == t).length})</option>`)
-          .join("")}</select></div>
+        <div><span>Thèmes</span><button class="${c.t.length ? "" : "on"}" data-qtt="" aria-pressed="${!c.t.length}">Tous</button>${topics
+          .map(
+            (t) =>
+              `<button class="${c.t.includes(t) ? "on" : ""}" data-qtt="${t}" aria-pressed="${c.t.includes(t)}">${esc(qtName(t))} (${qpool("t").filter((q) => q.t == t).length})</button>`,
+          )
+          .join("")}</div>
         <div><span>Questions</span>${chips("n", [[10, "10"], [20, "20"], [0, "Toutes"]])}</div>
       </div>
       <div class="acts">
@@ -786,7 +791,7 @@ document.addEventListener("click", (e) => {
   // Lien « S'entraîner sur ce thème » : règle le thème du QCM avant d'y aller.
   const qt = e.target.closest("a[data-qt]");
   if (qt) {
-    Object.assign(qz.cfg, { t: qt.dataset.qt, lv: "all", k: "all" });
+    Object.assign(qz.cfg, { t: [qt.dataset.qt], lv: "all", k: "all" });
     ls.set("quizcfg", qz.cfg);
     qz.run = null;
   }
@@ -854,10 +859,17 @@ document.addEventListener("click", (e) => {
   // Entraînement : réglage, réponse cochée.
   if (d.qc) {
     const [key, v] = d.qc.split(":");
-    qz.cfg[key] = key == "n" ? +v : v;
+    qz.cfg[key] = key == "n" ? +v : key == "t" ? [v] : v;
     ls.set("quizcfg", qz.cfg);
     render();
     return key == "t" ? window.scrollTo(0, 0) : 0;
+  }
+  // Thèmes du QCM : chaque bouton ajoute ou retire son thème ; « Tous » vide la sélection.
+  if (d.qtt != null) {
+    const t = qz.cfg.t;
+    qz.cfg.t = !d.qtt ? [] : t.includes(d.qtt) ? t.filter((x) => x != d.qtt) : [...t, d.qtt];
+    ls.set("quizcfg", qz.cfg);
+    return render();
   }
   if (d.o) {
     const r = qz.run,
@@ -918,14 +930,9 @@ document.addEventListener("input", (e) => {
   $$("#gsteps details").forEach((x, i) => (x.open = open[i]));
   $("#vcount").textContent = varsCount(varsOf(t));
 });
-// Menus déroulants : fiche du Guide (mobile) et thème de l'entraînement.
+// Menu déroulant de la fiche du Guide (mobile).
 document.addEventListener("change", (e) => {
   if (e.target.id == "gsel") location.hash = "#guide/" + e.target.value;
-  if (e.target.id == "qtopic") {
-    qz.cfg.t = e.target.value;
-    ls.set("quizcfg", qz.cfg);
-    render();
-  }
 });
 // Mémorise si le panneau des variables est ouvert ou fermé.
 document.addEventListener(

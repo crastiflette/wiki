@@ -832,15 +832,6 @@ pre.raw {
 .qcfg > div > span {
   width: 86px;
 }
-.qcfg select {
-  padding: 6px 10px;
-  border-radius: 9px;
-  border: 1px solid var(--bd);
-  background: var(--pn);
-  color: var(--tx);
-  font: 500 14px var(--f1);
-  max-width: 100%;
-}
 .qnote {
   font-size: 13px !important;
   margin: 10px 0 0 !important;
