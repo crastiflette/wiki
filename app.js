@@ -1,5 +1,5 @@
 // Numéro de version affiché dans la barre latérale (voir CHANGELOG.md).
-const VERSION = "2.3.0";
+const VERSION = "2.4.0";
 // Les 4 types de blocs d'une fiche : clé -> libellé affiché.
 const TYPES = { C: "CONFIG", S: "SHOW", T: "TROUBLESHOOT", D: "DEBUG" };
 // Les 4 vues de l'application : [identifiant (aussi utilisé dans l'URL : #ref, #fav…), libellé].

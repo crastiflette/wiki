@@ -13,7 +13,7 @@ C'est un site statique : du HTML, du CSS et du JavaScript, sans dépendance ni �
 | **Guide** | `#guide/<fiche>` | 35 fiches pas à pas. Chacune a ses étapes (obligatoire, recommandée ou facultative), ses commandes de vérification, ses pièges courants et souvent un schéma de topologie et un exemple de sortie. |
 | **Référence** | `#ref` | Toutes les commandes des fiches, avec des filtres par niveau, catégorie et type (config, show, dépannage, debug). |
 | **Favoris** | `#fav` | Les commandes marquées d'une étoile, regroupées par fiche. |
-| **Entraînement** | `#quiz` | 197 questions : 105 CCNA, 73 CCNP ENCOR et 19 CSNE (Stormshield), avec au moins 5 questions par fiche. Chaque réponse est expliquée. Le site suit ta progression et peut te reproposer tes erreurs. |
+| **Entraînement** | `#quiz` | 207 questions : 105 CCNA, 73 CCNP ENCOR et 29 CSNE (Stormshield), avec au moins 5 questions par fiche. Chaque réponse est expliquée. Le site suit ta progression et peut te reproposer tes erreurs. |
 
 Autres fonctions :
 - **Variables** : les `<VARIABLES>` d'une fiche (adresse IP, VLAN…) peuvent être remplies. Tes

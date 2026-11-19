@@ -1,5 +1,17 @@
 # Historique des versions
 
+## v2.4.0 — QCM CSNE : VPN IPsec avancé et tunnels GRE / GRETAP
+
+- **10 nouvelles questions CSNE**, recopiées des quiz du livre de formation Stormshield CSNE v4.8,
+  avec les réponses du corrigé (p. 353) :
+  - **VPN IPsec avancé** (p. 245-246) : 6 questions Vrai / Faux (NAT-T, Liveness, certificats et
+    autorités de confiance, wildcards dans le Peer ID, mode config) ;
+  - **Tunnels GRE et GRETAP** (p. 269) : 4 questions (protocole de transport de GRE, keepalive,
+    GRE protégé par IPsec, GRETAP hors d'un bridge).
+- Chaque question a une courte explication, rédigée à partir du cours du livre.
+- Deux nouveaux thèmes dans le filtre du QCM : « VPN IPsec avancé » et « Tunnels GRE et GRETAP ».
+- Le QCM passe de 197 à **207 questions** : 105 CCNA, 73 CCNP ENCOR et 29 CSNE.
+
 ## v2.3.0 — QCM : au moins 5 questions par fiche
 
 - **112 nouvelles questions** : chacune des 35 fiches en a désormais au moins 5 (PVLAN n'en avait
